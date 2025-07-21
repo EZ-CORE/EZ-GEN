@@ -80,7 +80,8 @@ app.post('/api/generate-app', upload.fields([
       success: true,
       appId,
       message: 'App generated successfully!',
-      downloadUrl: `/api/download/${appId}`
+      downloadUrl: `/api/download/${appId}`,
+      apkDownloadUrl: `/api/download-apk/${appId}`
     });  } catch (error) {
     console.error('Error generating app:', error);
     res.status(500).json({
@@ -123,6 +124,43 @@ app.get('/api/download/:appId', async (req, res) => {
   } catch (error) {
     console.error('Download error:', error);
     res.status(500).json({ error: 'Failed to download app' });
+  }
+});
+
+// Download APK file directly
+app.get('/api/download-apk/:appId', async (req, res) => {
+  try {
+    const { appId } = req.params;
+    
+    // First try to find APK in the apks folder by matching app name
+    const apksDir = path.join(__dirname, 'apks');
+    if (await fs.pathExists(apksDir)) {
+      const apkFiles = await fs.readdir(apksDir);
+      const apkFile = apkFiles.find(file => file.endsWith('.apk'));
+      
+      if (apkFile) {
+        const apkPath = path.join(apksDir, apkFile);
+        return res.download(apkPath, apkFile);
+      }
+    }
+    
+    // Fallback: look in the app directory
+    const appDir = path.join(__dirname, 'generated-apps', appId);
+    if (await fs.pathExists(appDir)) {
+      const apkFiles = await fs.readdir(appDir);
+      const apkFile = apkFiles.find(file => file.endsWith('.apk'));
+      
+      if (apkFile) {
+        const apkPath = path.join(appDir, apkFile);
+        return res.download(apkPath, apkFile);
+      }
+    }
+    
+    return res.status(404).json({ error: 'APK not found' });
+    
+  } catch (error) {
+    console.error('APK download error:', error);
+    res.status(500).json({ error: 'Failed to download APK' });
   }
 });
 

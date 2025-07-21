@@ -308,9 +308,17 @@
                     resultDiv.innerHTML = `
                         <h3>✅ App Generated Successfully!</h3>
                         <p>${result.message}</p>
-                        <a href="${result.downloadUrl}" class="download-btn" download>
-                            📥 Download App Package
-                        </a>
+                        <div style="margin-top: 15px;">
+                            <a href="${result.apkDownloadUrl}" class="download-btn" download style="margin-right: 10px;">
+                                📱 Download APK
+                            </a>
+                            <a href="${result.downloadUrl}" class="download-btn" download style="background: #6b7280;">
+                                � Download Project
+                            </a>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                            💡 Download APK to install on your Android device, or download the full project for development.
+                        </p>
                     `;
                 } else {
                     resultDiv.className = 'result error';

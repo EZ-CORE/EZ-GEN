@@ -144,10 +144,16 @@
             background: #3b82f6;
             color: white;
             text-decoration: none;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-radius: 6px;
             margin-top: 10px;
             display: inline-block;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+        
+        .download-btn:hover {
+            background: #2563eb;
         }
         
         .loading {
@@ -308,9 +314,17 @@
                     resultDiv.innerHTML = `
                         <h3>✅ App Generated Successfully!</h3>
                         <p>${result.message}</p>
-                        <a href="${result.downloadUrl}" class="download-btn" download>
-                            📥 Download App Package
-                        </a>
+                        <div style="margin-top: 15px;">
+                            <a href="${result.apkDownloadUrl}" class="download-btn" download style="margin-right: 10px;">
+                                📱 Download APK
+                            </a>
+                            <a href="${result.downloadUrl}" class="download-btn" download style="background: #6b7280;">
+                                📁 Download Project
+                            </a>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                            💡 Download APK to install on your Android device, or download the full project for development.
+                        </p>
                     `;
                 } else {
                     resultDiv.className = 'result error';
