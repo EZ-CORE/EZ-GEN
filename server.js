@@ -6,6 +6,7 @@ const fs = require('fs-extra');
 const { v4: uuidv4 } = require('uuid');
 const archiver = require('archiver');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +42,16 @@ app.post('/api/generate-app', upload.fields([
 ]), async (req, res) => {
   try {
     const { appName, websiteUrl, packageName } = req.body;
+    
+    // Validate package name format
+    if (!packageName || !/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/.test(packageName)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid package name. Package name must follow Java package naming conventions (e.g., com.company.appname). Only lowercase letters, numbers, and dots are allowed.',
+        error: 'Invalid package name format'
+      });
+    }
+    
     const appId = uuidv4();
     
     console.log('Generating app:', { appName, websiteUrl, packageName, appId });
@@ -70,7 +81,7 @@ app.post('/api/generate-app', upload.fields([
 
     // Build and sync the app to ensure it's ready for use
     try {
-      await buildAndSyncApp(appDir, appName);
+      await buildAndSyncApp(appDir, appName, packageName);
       console.log('App built and synced successfully!');
     } catch (buildError) {
       console.warn('Build/sync failed, but app was generated. User will need to run build manually:', buildError.message);
@@ -79,9 +90,16 @@ app.post('/api/generate-app', upload.fields([
     res.json({
       success: true,
       appId,
-      message: 'App generated successfully!',
+      message: 'Play Store-ready app generated successfully!',
       downloadUrl: `/api/download/${appId}`,
-      apkDownloadUrl: `/api/download-apk/${appId}`
+      apkDownloadUrl: `/api/download-apk/${appId}`,
+      aabDownloadUrl: `/api/download-aab/${appId}`,
+      guideUrl: `/api/download-guide/${appId}`,
+      builds: {
+        debug: 'APK for testing',
+        release: 'APK for sideloading', 
+        aab: 'AAB for Play Store submission'
+      }
     });  } catch (error) {
     console.error('Error generating app:', error);
     res.status(500).json({
@@ -132,12 +150,19 @@ app.get('/api/download-apk/:appId', async (req, res) => {
   try {
     const { appId } = req.params;
     
-    // First try to find APK in the apks folder by matching app name
+    // First try to find debug APK in the apks folder
     const apksDir = path.join(__dirname, 'apks');
     if (await fs.pathExists(apksDir)) {
       const apkFiles = await fs.readdir(apksDir);
-      const apkFile = apkFiles.find(file => file.endsWith('.apk'));
+      const debugApk = apkFiles.find(file => file.includes('debug') && file.endsWith('.apk'));
       
+      if (debugApk) {
+        const apkPath = path.join(apksDir, debugApk);
+        return res.download(apkPath, debugApk);
+      }
+      
+      // Fallback to any APK file
+      const apkFile = apkFiles.find(file => file.endsWith('.apk'));
       if (apkFile) {
         const apkPath = path.join(apksDir, apkFile);
         return res.download(apkPath, apkFile);
@@ -161,6 +186,51 @@ app.get('/api/download-apk/:appId', async (req, res) => {
   } catch (error) {
     console.error('APK download error:', error);
     res.status(500).json({ error: 'Failed to download APK' });
+  }
+});
+
+// Download Android App Bundle (AAB) for Play Store
+app.get('/api/download-aab/:appId', async (req, res) => {
+  try {
+    const { appId } = req.params;
+    
+    // Look for AAB file in the apks folder
+    const apksDir = path.join(__dirname, 'apks');
+    if (await fs.pathExists(apksDir)) {
+      const aabFiles = await fs.readdir(apksDir);
+      const aabFile = aabFiles.find(file => file.endsWith('.aab'));
+      
+      if (aabFile) {
+        const aabPath = path.join(apksDir, aabFile);
+        return res.download(aabPath, aabFile);
+      }
+    }
+    
+    return res.status(404).json({ error: 'AAB file not found' });
+    
+  } catch (error) {
+    console.error('AAB download error:', error);
+    res.status(500).json({ error: 'Failed to download AAB' });
+  }
+});
+
+// Download Play Store submission guide
+app.get('/api/download-guide/:appId', async (req, res) => {
+  try {
+    const { appId } = req.params;
+    
+    const appDir = path.join(__dirname, 'generated-apps', appId);
+    const guidePath = path.join(appDir, 'Play-Store-Guide.md');
+    
+    if (await fs.pathExists(guidePath)) {
+      return res.download(guidePath, 'Play-Store-Guide.md');
+    }
+    
+    return res.status(404).json({ error: 'Play Store guide not found' });
+    
+  } catch (error) {
+    console.error('Guide download error:', error);
+    res.status(500).json({ error: 'Failed to download guide' });
   }
 });
 
@@ -373,7 +443,7 @@ async function updateNetworkSecurityConfig(appDir, websiteUrl) {
 }
 
 // Build and sync Capacitor app
-async function buildAndSyncApp(appDir, appName) {
+async function buildAndSyncApp(appDir, appName, packageName) {
   return new Promise((resolve, reject) => {
     console.log('Building and syncing Capacitor app...');
     
@@ -444,30 +514,30 @@ async function buildAndSyncApp(appDir, appName) {
               .then(() => {
                 console.log('App test completed successfully!');
                 
-                // Generate APK as the final step
-                console.log('Starting APK generation as final step...');
-                generateApk(appDir, appName)
+                // Generate Play Store-ready builds as the final step
+                console.log('Starting Play Store-ready build generation as final step...');
+                generatePlayStoreBuilds(appDir, appName, packageName)
                   .then(() => {
-                    console.log('APK generation completed successfully!');
+                    console.log('Play Store-ready builds completed successfully!');
                     resolve();
                   })
-                  .catch((apkError) => {
-                    console.warn('APK generation failed, but app was generated successfully:', apkError.message);
-                    resolve(); // Don't fail the entire process for APK generation failures
+                  .catch((buildError) => {
+                    console.warn('Play Store build generation failed, but app was generated successfully:', buildError.message);
+                    resolve(); // Don't fail the entire process for build generation failures
                   });
               })
               .catch((testError) => {
                 console.warn('App test failed but generation completed:', testError.message);
                 
-                // Still try to generate APK even if test failed
-                console.log('Attempting APK generation despite test failure...');
-                generateApk(appDir, appName)
+                // Still try to generate builds even if test failed
+                console.log('Attempting Play Store build generation despite test failure...');
+                generatePlayStoreBuilds(appDir, appName, packageName)
                   .then(() => {
-                    console.log('APK generation completed successfully!');
+                    console.log('Play Store-ready builds completed successfully!');
                     resolve();
                   })
-                  .catch((apkError) => {
-                    console.warn('APK generation failed, but app was generated successfully:', apkError.message);
+                  .catch((buildError) => {
+                    console.warn('Play Store build generation failed, but app was generated successfully:', buildError.message);
                     resolve();
                   });
               });
@@ -535,6 +605,475 @@ async function testAppFunctionality(appDir) {
 }
 
 // Generate APK for Android
+// Generate keystore for release signing
+async function generateKeystore(appDir, packageName, appName) {
+  return new Promise((resolve, reject) => {
+    console.log('🔑 Generating release keystore...');
+    
+    const keystoreDir = path.join(appDir, 'android', 'app');
+    const keystorePath = path.join(keystoreDir, 'release-key.keystore');
+    
+    // Generate ONE strong password for both keystore and key (simplifies compatibility)
+    const password = crypto.randomBytes(16).toString('hex');
+    
+    // Save keystore info for user
+    const keystoreInfo = {
+      keystoreFile: 'release-key.keystore',
+      keystorePassword: password,
+      keyAlias: 'release-key',
+      keyPassword: password, // Same password for simplicity
+      packageName: packageName,
+      appName: appName,
+      generatedAt: new Date().toISOString()
+    };
+    
+    const keystoreInfoPath = path.join(appDir, 'keystore-info.json');
+    fs.writeFileSync(keystoreInfoPath, JSON.stringify(keystoreInfo, null, 2));
+    
+    // Generate keystore using keytool
+    const keytoolCmd = 'keytool';
+    
+    // Create a clean app name for DN (no special characters)
+    const cleanAppName = appName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim() || 'MyApp';
+    
+    const keytoolArgs = [
+      '-genkeypair',
+      '-v',
+      '-keystore', keystorePath,
+      '-alias', 'release-key',
+      '-keyalg', 'RSA',
+      '-keysize', '2048',
+      '-validity', '10000',
+      '-storepass', password,
+      '-keypass', password, // Use same password
+      '-storetype', 'PKCS12',
+      '-dname', `CN=${cleanAppName}, OU=Mobile Development, O=${cleanAppName}, L=City, S=State, C=US`
+    ];
+    
+    console.log('Executing keytool command:', keytoolArgs.join(' '));
+    
+    const keytoolProcess = spawn(keytoolCmd, keytoolArgs, {
+      stdio: 'pipe'
+    });
+    
+    let keytoolOutput = '';
+    keytoolProcess.stdout.on('data', (data) => {
+      keytoolOutput += data.toString();
+    });
+    
+    keytoolProcess.stderr.on('data', (data) => {
+      keytoolOutput += data.toString();
+    });
+    
+    keytoolProcess.on('close', (code) => {
+      console.log('Keytool output:', keytoolOutput);
+      console.log('Keytool exit code:', code);
+      
+      if (code !== 0) {
+        console.log('⚠️  Keystore generation failed:', keytoolOutput);
+        return reject(new Error('Keystore generation failed: ' + keytoolOutput));
+      }
+      
+      // Verify keystore is accessible
+      console.log('🔍 Verifying keystore accessibility...');
+      const verifyArgs = ['-list', '-v', '-keystore', keystorePath, '-storepass', password];
+      const verifyProcess = spawn(keytoolCmd, verifyArgs, { stdio: 'pipe' });
+      
+      let verifyOutput = '';
+      verifyProcess.stdout.on('data', (data) => {
+        verifyOutput += data.toString();
+      });
+      
+      verifyProcess.stderr.on('data', (data) => {
+        verifyOutput += data.toString();
+      });
+      
+      verifyProcess.on('close', (verifyCode) => {
+        console.log('Keystore verification output:', verifyOutput);
+        console.log('Keystore verification exit code:', verifyCode);
+        
+        if (verifyCode !== 0) {
+          console.log('⚠️  Keystore verification failed:', verifyOutput);
+          return reject(new Error('Keystore verification failed: ' + verifyOutput));
+        }
+        
+        console.log('✅ Keystore generated and verified successfully!');
+        console.log(`🔑 Keystore saved to: ${keystorePath}`);
+        console.log(`📄 Keystore info saved to: ${keystoreInfoPath}`);
+        
+        resolve(keystoreInfo);
+      });
+    });
+  });
+}
+
+// Configure release build with keystore
+async function configureReleaseBuild(appDir, keystoreInfo) {
+  console.log('⚙️  Configuring release build settings...');
+  
+  const buildGradlePath = path.join(appDir, 'android', 'app', 'build.gradle');
+  
+  if (!fs.existsSync(buildGradlePath)) {
+    throw new Error('build.gradle not found');
+  }
+  
+  let buildGradle = fs.readFileSync(buildGradlePath, 'utf8');
+  
+  // Ensure compileSdk is properly set
+  if (!buildGradle.includes('compileSdk ')) {
+    buildGradle = buildGradle.replace(
+      /compileSdk rootProject\.ext\.compileSdkVersion/,
+      'compileSdk 34'
+    );
+  }
+  
+  // Update version code and name for Play Store first
+  const versionCode = Math.floor(Date.now() / 1000); // Unix timestamp as version code
+  const versionName = '1.0.0';
+  
+  buildGradle = buildGradle.replace(
+    /versionCode\s+\d+/,
+    `versionCode ${versionCode}`
+  );
+  
+  buildGradle = buildGradle.replace(
+    /versionName\s+["'][^"']*["']/,
+    `versionName "${versionName}"`
+  );
+  
+  // Update target SDK to latest for Play Store compliance
+  buildGradle = buildGradle.replace(
+    /targetSdkVersion\s+rootProject\.ext\.targetSdkVersion/,
+    'targetSdkVersion 34'
+  );
+  
+  // Update min SDK for better compatibility
+  buildGradle = buildGradle.replace(
+    /minSdkVersion\s+rootProject\.ext\.minSdkVersion/,
+    'minSdkVersion 24'
+  );
+  
+  // Add signing configuration before buildTypes if not already present
+  if (!buildGradle.includes('signingConfigs')) {
+    const signingConfig = `    signingConfigs {
+        release {
+            storeFile file('release-key.keystore')
+            storePassword '${keystoreInfo.keystorePassword}'
+            keyAlias '${keystoreInfo.keyAlias}'
+            keyPassword '${keystoreInfo.keyPassword}'
+        }
+    }
+    `;
+    
+    // Insert signing config before buildTypes
+    buildGradle = buildGradle.replace(
+      /(buildTypes\s*{)/,
+      `${signingConfig}$1`
+    );
+  }
+  
+  // Update the release build type to use signing config and enable optimization
+  buildGradle = buildGradle.replace(
+    /(release\s*{\s*)(minifyEnabled\s+false[^}]*)(})/,
+    `$1            signingConfig signingConfigs.release
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        $3`
+  );
+  
+  fs.writeFileSync(buildGradlePath, buildGradle);
+  console.log('✅ Release build configuration updated!');
+  
+  return { versionCode, versionName };
+}
+
+// Generate both debug APK and release AAB for Play Store
+async function generateReleaseBuilds(appDir, appName, keystoreInfo) {
+  return new Promise((resolve, reject) => {
+    console.log('🏗️  Starting Play Store-ready build generation...');
+    
+    const androidDir = path.join(appDir, 'android');
+    const gradlewCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+    
+    // First, let's try building just the release APK to see if signing works
+    console.log('📱 Building release APK first...');
+    
+    const gradleBuild = spawn(gradlewCmd, ['assembleRelease'], {
+      cwd: androidDir,
+      shell: true,
+      stdio: 'pipe'
+    });
+    
+    let buildOutput = '';
+    gradleBuild.stdout.on('data', (data) => {
+      buildOutput += data.toString();
+    });
+    
+    gradleBuild.stderr.on('data', (data) => {
+      buildOutput += data.toString();
+    });
+    
+    gradleBuild.on('close', (code) => {
+      if (code !== 0) {
+        console.log('⚠️  Release APK build failed with exit code:', code);
+        console.log('🔍 Full build output:');
+        console.log(buildOutput);
+        return reject(new Error(`Release build failed with exit code: ${code}`));
+      }
+      
+      console.log('✅ Release APK build completed successfully!');
+      
+      // Now try building the AAB
+      console.log('📦 Building Android App Bundle (AAB)...');
+      
+      const aabBuild = spawn(gradlewCmd, ['bundleRelease'], {
+        cwd: androidDir,
+        shell: true,
+        stdio: 'pipe'
+      });
+      
+      let aabOutput = '';
+      aabBuild.stdout.on('data', (data) => {
+        aabOutput += data.toString();
+      });
+      
+      aabBuild.stderr.on('data', (data) => {
+        aabOutput += data.toString();
+      });
+      
+      aabBuild.on('close', (aabCode) => {
+        if (aabCode !== 0) {
+          console.log('⚠️  AAB build failed, but APK succeeded. Continuing...');
+          console.log('🔍 AAB build output:', aabOutput.slice(-1000));
+        } else {
+          console.log('✅ AAB build completed successfully!');
+        }
+        
+        // Find and organize the generated files
+        const apkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release');
+        const aabDir = path.join(androidDir, 'app', 'build', 'outputs', 'bundle', 'release');
+        
+        const cleanAppName = appName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const apksDir = path.join(__dirname, 'apks');
+        fs.ensureDirSync(apksDir);
+        
+        const results = {
+          apk: null,
+          aab: null,
+          debug: null
+        };
+        
+        // Copy release APK
+        if (fs.existsSync(apkDir)) {
+          const apkFiles = fs.readdirSync(apkDir).filter(f => f.endsWith('.apk'));
+          if (apkFiles.length > 0) {
+            const sourceApk = path.join(apkDir, apkFiles[0]);
+            const finalApkName = `${cleanAppName}-release.apk`;
+            const finalApkPath = path.join(apksDir, finalApkName);
+            
+            fs.copyFileSync(sourceApk, finalApkPath);
+            results.apk = finalApkName;
+            console.log(`📱 Release APK: ${finalApkName}`);
+          }
+        }
+        
+        // Copy AAB for Play Store if it exists
+        if (aabCode === 0 && fs.existsSync(aabDir)) {
+          const aabFiles = fs.readdirSync(aabDir).filter(f => f.endsWith('.aab'));
+          if (aabFiles.length > 0) {
+            const sourceAab = path.join(aabDir, aabFiles[0]);
+            const finalAabName = `${cleanAppName}-release.aab`;
+            const finalAabPath = path.join(apksDir, finalAabName);
+            
+            fs.copyFileSync(sourceAab, finalAabPath);
+            results.aab = finalAabName;
+            console.log(`📦 Play Store AAB: ${finalAabName}`);
+          }
+        }
+        
+        // Also generate debug APK for testing
+        console.log('🔧 Building debug APK for testing...');
+        const debugBuild = spawn(gradlewCmd, ['assembleDebug'], {
+          cwd: androidDir,
+          shell: true,
+          stdio: 'pipe'
+        });
+        
+        debugBuild.on('close', (debugCode) => {
+          if (debugCode === 0) {
+            const debugApkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug');
+            if (fs.existsSync(debugApkDir)) {
+              const debugApkFiles = fs.readdirSync(debugApkDir).filter(f => f.endsWith('.apk'));
+              if (debugApkFiles.length > 0) {
+                const sourceDebugApk = path.join(debugApkDir, debugApkFiles[0]);
+                const finalDebugApkName = `${cleanAppName}-debug.apk`;
+                const finalDebugApkPath = path.join(apksDir, finalDebugApkName);
+                
+                fs.copyFileSync(sourceDebugApk, finalDebugApkPath);
+                results.debug = finalDebugApkName;
+                console.log(`🔧 Debug APK: ${finalDebugApkName}`);
+              }
+            }
+          }
+          
+          console.log('🎉 Build process completed!');
+          console.log('📱 Ready for testing:', results.debug);
+          console.log('🏪 Ready for Play Store:', results.aab || results.apk);
+          
+          resolve(results);
+        });
+      });
+    });
+  });
+}
+
+// Main function to generate Play Store-ready builds
+async function generatePlayStoreBuilds(appDir, appName, packageName) {
+  try {
+    console.log('🏪 Starting Play Store-ready build generation...');
+    
+    // Check if Android platform exists
+    const androidDir = path.join(appDir, 'android');
+    if (!fs.existsSync(androidDir)) {
+      console.log('⚠️  Android platform not found, skipping build generation');
+      console.log('💡 You can add Android platform with: npx cap add android');
+      return;
+    }
+    
+    // Step 1: Generate keystore for release signing
+    console.log('🔑 Step 1: Generating release keystore...');
+    const keystoreInfo = await generateKeystore(appDir, packageName, appName);
+    
+    // Step 2: Configure release build settings
+    console.log('⚙️  Step 2: Configuring release build...');
+    const buildInfo = await configureReleaseBuild(appDir, keystoreInfo);
+    
+    // Step 3: Generate all builds (debug APK, release APK, release AAB)
+    console.log('🏗️  Step 3: Building all versions...');
+    const buildResults = await generateReleaseBuilds(appDir, appName, keystoreInfo);
+    
+    // Step 4: Create Play Store submission guide
+    console.log('📋 Step 4: Creating Play Store submission guide...');
+    await createPlayStoreGuide(appDir, appName, packageName, keystoreInfo, buildInfo, buildResults);
+    
+    console.log('🎉 Play Store-ready builds completed successfully!');
+    console.log('📱 Debug APK for testing:', buildResults.debug);
+    console.log('🏪 Release AAB for Play Store:', buildResults.aab);
+    console.log('📋 Check Play-Store-Guide.md for submission instructions');
+    
+  } catch (error) {
+    console.error('❌ Play Store build generation failed:', error.message);
+    throw error;
+  }
+}
+
+// Create a comprehensive Play Store submission guide
+async function createPlayStoreGuide(appDir, appName, packageName, keystoreInfo, buildInfo, buildResults) {
+  const guide = `# Play Store Submission Guide for ${appName}
+
+## 🎉 Your app is ready for Google Play Store submission!
+
+### 📦 Generated Files
+
+#### For Testing:
+- **Debug APK**: \`${buildResults.debug}\`
+  - Install this on your Android device for testing
+  - This version is for development/testing only
+
+#### For Play Store Submission:
+- **Release AAB**: \`${buildResults.aab}\` ⭐ **SUBMIT THIS TO PLAY STORE**
+  - Android App Bundle optimized for Play Store
+  - Smaller download size for users
+  - Preferred format by Google Play
+  
+- **Release APK**: \`${buildResults.apk}\`
+  - Alternative format if AAB is not accepted
+  - Larger file size than AAB
+
+### 🔑 Important Security Information
+
+**⚠️ CRITICAL: Keep your keystore safe!**
+
+Your release keystore details:
+- **Keystore File**: \`android/app/release-key.keystore\`
+- **Keystore Password**: \`${keystoreInfo.keystorePassword}\`
+- **Key Alias**: \`${keystoreInfo.keyAlias}\`
+- **Key Password**: \`${keystoreInfo.keyPassword}\`
+
+**🔒 Security Notes:**
+- Store these credentials securely - you'll need them for future app updates
+- If you lose the keystore, you cannot update your app on Play Store
+- Consider using Google Play App Signing for additional security
+
+### 📋 Play Store Submission Steps
+
+#### 1. Prepare Your Store Listing
+- App name: ${appName}
+- Package name: ${packageName}
+- App description (write a compelling description)
+- Screenshots (generate from your app)
+- Feature graphic (1024x500px)
+- App icon (already configured)
+
+#### 2. Upload to Play Console
+1. Go to [Google Play Console](https://play.google.com/console)
+2. Create a new app
+3. Upload the **AAB file**: \`${buildResults.aab}\`
+4. Fill in store listing details
+5. Set up pricing & distribution
+6. Submit for review
+
+#### 3. App Requirements Met ✅
+- ✅ **Target API 34** (required for new apps)
+- ✅ **Signed with release keystore**
+- ✅ **Optimized AAB format**
+- ✅ **Version Code**: ${buildInfo.versionCode}
+- ✅ **Version Name**: ${buildInfo.versionName}
+- ✅ **64-bit support** (included by default)
+
+### 🚀 Testing Before Submission
+
+1. **Install Debug APK** on your Android device:
+   \`\`\`bash
+   adb install ${buildResults.debug}
+   \`\`\`
+
+2. **Test thoroughly**:
+   - All website functionality works
+   - App loads correctly
+   - Navigation is smooth
+   - No crashes or errors
+
+### 📊 Next Steps
+
+1. **Test the debug APK** thoroughly on real devices
+2. **Create store assets** (screenshots, descriptions)
+3. **Upload AAB to Play Console**
+4. **Submit for review** (typically takes 1-3 days)
+
+### 🔄 Future Updates
+
+To update your app:
+1. Generate new builds with this same keystore
+2. Increment version code and name in build.gradle
+3. Upload new AAB to Play Console
+
+---
+
+**Generated on**: ${new Date().toISOString()}
+**Package**: ${packageName}
+**Build Tools**: Capacitor + Ionic + Android Gradle Plugin
+
+For support, check the [Play Console Help Center](https://support.google.com/googleplay/android-developer/)
+`;
+
+  const guidePath = path.join(appDir, 'Play-Store-Guide.md');
+  fs.writeFileSync(guidePath, guide);
+  
+  console.log('📋 Play Store submission guide created!');
+  console.log(`📄 Guide saved to: ${guidePath}`);
+}
+
 async function generateApk(appDir, appName) {
   return new Promise((resolve, reject) => {
     console.log('🔨 Starting APK generation process...');

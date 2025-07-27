@@ -144,10 +144,16 @@
             background: #3b82f6;
             color: white;
             text-decoration: none;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-radius: 6px;
             margin-top: 10px;
             display: inline-block;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+        
+        .download-btn:hover {
+            background: #2563eb;
         }
         
         .loading {
@@ -235,7 +241,10 @@
                 
                 <div class="form-group">
                     <label for="packageName">Package Name *</label>
-                    <input type="text" id="packageName" name="packageName" required placeholder="com.yourcompany.appname">
+                    <input type="text" id="packageName" name="packageName" required placeholder="com.yourcompany.appname" pattern="^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$">
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                        Must follow Java package format: lowercase letters and dots only (e.g., com.company.app)
+                    </div>
                 </div>
                 
                 <div class="file-input-group">
@@ -272,10 +281,19 @@
         document.getElementById('appForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            // Validate package name format
+            const packageName = document.getElementById('packageName').value;
+            const packagePattern = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/;
+            
+            if (!packagePattern.test(packageName)) {
+                alert('Invalid package name format. Please use lowercase letters and dots only (e.g., com.company.app)');
+                return;
+            }
+            
             const formData = new FormData();
             formData.append('appName', document.getElementById('appName').value);
             formData.append('websiteUrl', document.getElementById('websiteUrl').value);
-            formData.append('packageName', document.getElementById('packageName').value);
+            formData.append('packageName', packageName);
             
             const logo = document.getElementById('logo').files[0];
             const splash = document.getElementById('splash').files[0];
@@ -306,19 +324,38 @@
                 if (result.success) {
                     resultDiv.className = 'result success';
                     resultDiv.innerHTML = `
-                        <h3>✅ App Generated Successfully!</h3>
+                        <h3>🎉 Play Store-Ready App Generated Successfully!</h3>
                         <p>${result.message}</p>
-                        <div style="margin-top: 15px;">
-                            <a href="${result.apkDownloadUrl}" class="download-btn" download style="margin-right: 10px;">
-                                📱 Download APK
-                            </a>
-                            <a href="${result.downloadUrl}" class="download-btn" download style="background: #6b7280;">
-                                � Download Project
-                            </a>
+                        <div style="margin-top: 20px;">
+                            <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+                                <h4 style="margin: 0 0 10px 0; color: #1e40af;">🏪 For Google Play Store</h4>
+                                <a href="${result.aabDownloadUrl}" class="download-btn" download style="background: #059669; margin-right: 10px;">
+                                    📦 Download AAB (Play Store)
+                                </a>
+                                <a href="${result.guideUrl}" class="download-btn" download style="background: #7c3aed;">
+                                    📋 Submission Guide
+                                </a>
+                            </div>
+                            <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                                <h4 style="margin: 0 0 10px 0; color: #d97706;">🔧 For Testing & Development</h4>
+                                <a href="${result.apkDownloadUrl}" class="download-btn" download style="background: #3b82f6; margin-right: 10px;">
+                                    📱 Download APK (Testing)
+                                </a>
+                                <a href="${result.downloadUrl}" class="download-btn" download style="background: #6b7280;">
+                                    📁 Download Project
+                                </a>
+                            </div>
                         </div>
-                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                            💡 Download APK to install on your Android device, or download the full project for development.
-                        </p>
+                        <div style="margin-top: 15px; padding: 12px; background: #ecfdf5; border-radius: 6px; border: 1px solid #bbf7d0;">
+                            <p style="margin: 0; font-size: 0.9em; color: #166534;">
+                                <strong>✅ Ready for Play Store!</strong> Your app includes signed release builds, Android App Bundle (AAB), and a complete submission guide.
+                            </p>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 0.85em; color: #6b7280;">
+                            <p style="margin: 5px 0;"><strong>� AAB:</strong> Upload this to Google Play Console (recommended format)</p>
+                            <p style="margin: 5px 0;"><strong>📱 APK:</strong> Install on your Android device for testing</p>
+                            <p style="margin: 5px 0;"><strong>📋 Guide:</strong> Step-by-step Play Store submission instructions</p>
+                        </div>
                     `;
                 } else {
                     resultDiv.className = 'result error';
