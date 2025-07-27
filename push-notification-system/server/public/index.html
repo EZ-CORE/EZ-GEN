@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📱 EZ-GEN Push Notification Tester</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📱 Push Notification Testing Center</h1>
+            <p>Send test notifications to your EZ-GEN mobile apps</p>
+        </header>
+
+        <div class="status-bar">
+            <div id="server-status" class="status-item">
+                <span class="status-dot"></span>
+                <span class="status-text">Checking server...</span>
+            </div>
+            <div id="firebase-status" class="status-item">
+                <span class="status-dot"></span>
+                <span class="status-text">Checking Firebase...</span>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('single')">Single Device</button>
+            <button class="tab-button" onclick="showTab('bulk')">Bulk Send</button>
+            <button class="tab-button" onclick="showTab('topic')">Topic Send</button>
+            <button class="tab-button" onclick="showTab('validate')">Validate Token</button>
+        </div>
+
+        <!-- Single Device Tab -->
+        <div id="single-tab" class="tab-content active">
+            <div class="form-section">
+                <h3>📲 Send to Single Device</h3>
+                <form id="single-notification-form">
+                    <div class="form-group">
+                        <label for="device-token">Device FCM Token *</label>
+                        <textarea id="device-token" placeholder="Paste your FCM token here..." required></textarea>
+                        <small>Get this token from your mobile app's debug console</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="notification-title">Title *</label>
+                            <input type="text" id="notification-title" placeholder="Notification title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="notification-sound">Sound</label>
+                            <select id="notification-sound">
+                                <option value="default">Default</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notification-body">Message *</label>
+                        <textarea id="notification-body" placeholder="Your notification message" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notification-image">Image URL (optional)</label>
+                        <input type="url" id="notification-image" placeholder="https://example.com/image.jpg">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="deep-link">Deep Link (optional)</label>
+                        <input type="text" id="deep-link" placeholder="/home, /profile, /settings">
+                        <small>Page to open when notification is tapped</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="custom-data">Custom Data (JSON)</label>
+                        <textarea id="custom-data" placeholder='{"key": "value", "userId": "123"}'></textarea>
+                        <small>Additional data to send with notification</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">🚀 Send Notification</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bulk Send Tab -->
+        <div id="bulk-tab" class="tab-content">
+            <div class="form-section">
+                <h3>📢 Send to Multiple Devices</h3>
+                <form id="bulk-notification-form">
+                    <div class="form-group">
+                        <label for="bulk-tokens">Device FCM Tokens *</label>
+                        <textarea id="bulk-tokens" placeholder="Paste FCM tokens (one per line)" required rows="6"></textarea>
+                        <small>Enter one FCM token per line</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="bulk-title">Title *</label>
+                            <input type="text" id="bulk-title" placeholder="Notification title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="bulk-sound">Sound</label>
+                            <select id="bulk-sound">
+                                <option value="default">Default</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulk-body">Message *</label>
+                        <textarea id="bulk-body" placeholder="Your notification message" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulk-image">Image URL (optional)</label>
+                        <input type="url" id="bulk-image" placeholder="https://example.com/image.jpg">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">📢 Send Bulk Notifications</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Topic Send Tab -->
+        <div id="topic-tab" class="tab-content">
+            <div class="form-section">
+                <h3>📡 Send to Topic Subscribers</h3>
+                <form id="topic-notification-form">
+                    <div class="form-group">
+                        <label for="topic-name">Topic Name *</label>
+                        <input type="text" id="topic-name" placeholder="general, news, updates" required>
+                        <small>Topic that users have subscribed to</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="topic-title">Title *</label>
+                            <input type="text" id="topic-title" placeholder="Notification title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="topic-sound">Sound</label>
+                            <select id="topic-sound">
+                                <option value="default">Default</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="topic-body">Message *</label>
+                        <textarea id="topic-body" placeholder="Your notification message" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="topic-image">Image URL (optional)</label>
+                        <input type="url" id="topic-image" placeholder="https://example.com/image.jpg">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="topic-deep-link">Deep Link (optional)</label>
+                        <input type="text" id="topic-deep-link" placeholder="/news, /updates">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">📡 Send to Topic</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Validate Token Tab -->
+        <div id="validate-tab" class="tab-content">
+            <div class="form-section">
+                <h3>✅ Validate FCM Token</h3>
+                <form id="validate-token-form">
+                    <div class="form-group">
+                        <label for="validate-token">FCM Token to Validate *</label>
+                        <textarea id="validate-token" placeholder="Paste your FCM token here..." required></textarea>
+                        <small>Check if this token is valid and can receive notifications</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-secondary">✅ Validate Token</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="results-section" style="display: none;">
+            <h3>📊 Results</h3>
+            <div id="results-content"></div>
+        </div>
+
+        <!-- Quick Test Buttons -->
+        <div class="quick-actions">
+            <h3>⚡ Quick Tests</h3>
+            <div class="quick-buttons">
+                <button class="btn btn-quick" onclick="sendQuickTest('welcome')">
+                    👋 Welcome Message
+                </button>
+                <button class="btn btn-quick" onclick="sendQuickTest('update')">
+                    🔄 App Update
+                </button>
+                <button class="btn btn-quick" onclick="sendQuickTest('reminder')">
+                    ⏰ Reminder
+                </button>
+                <button class="btn btn-quick" onclick="sendQuickTest('image')">
+                    🖼️ With Image
+                </button>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="help-section">
+            <h3>📚 How to Get FCM Token</h3>
+            <div class="help-content">
+                <div class="help-step">
+                    <h4>🔧 For Testing:</h4>
+                    <ol>
+                        <li>Install your app on a device</li>
+                        <li>Open browser console/debug tools</li>
+                        <li>Look for FCM token in logs</li>
+                        <li>Copy and paste it above</li>
+                    </ol>
+                </div>
+                <div class="help-step">
+                    <h4>📱 In Your App:</h4>
+                    <p>Add this code to get the token:</p>
+                    <pre><code>// Get FCM token
+import { PushNotifications } from '@capacitor/push-notifications';
+
+PushNotifications.requestPermissions().then(result => {
+  if (result.receive === 'granted') {
+    PushNotifications.register();
+  }
+});
+
+PushNotifications.addListener('registration', (token) => {
+  console.log('FCM Token:', token.value);
+});</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
