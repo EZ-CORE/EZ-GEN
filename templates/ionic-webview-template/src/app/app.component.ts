@@ -43,11 +43,15 @@ export class AppComponent implements OnInit {
 
   async loadInNativeWebView() {
     try {
-      // Show loading for a brief moment, then redirect
+      console.log('🌐 Starting native WebView load process...');
+      
+      // Wait longer to ensure push notifications are initialized
+      console.log('⏰ Waiting 5 seconds to ensure push notifications are fully initialized...');
       setTimeout(() => {
+        console.log('🚀 Now redirecting to website...');
         // Use Capacitor's native WebView to navigate to the website
         window.location.href = this.websiteUrl;
-      }, 1500); // Show loading spinner for 1.5 seconds for better UX
+      }, 5000); // Wait 5 seconds instead of 1.5 to allow push notification setup
     } catch (error) {
       console.error('Error loading website in native WebView:', error);
       this.loadingError = true;

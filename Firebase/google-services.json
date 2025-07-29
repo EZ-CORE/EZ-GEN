@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "23037188092",
+    "project_id": "ez-gen-notification",
+    "storage_bucket": "ez-gen-notification.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:23037188092:android:ec2304839da86916adc479",
+        "android_client_info": {
+          "package_name": "com.ezassist.timeless"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAx-_0N4gAvQa7QtnJN5jCdyazs_kNHM-Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

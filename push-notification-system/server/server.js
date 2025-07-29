@@ -24,13 +24,18 @@ function initializeFirebase() {
     
     const serviceAccount = require(serviceAccountPath);
     
+    // Ensure project ID is explicitly set
+    console.log('🔍 Service Account Project ID:', serviceAccount.project_id);
+    
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id,  // Explicitly set project ID
       databaseURL: process.env.FIREBASE_DATABASE_URL
     });
     
     firebaseInitialized = true;
     console.log('✅ Firebase Admin SDK initialized successfully');
+    console.log('✅ Project ID set to:', serviceAccount.project_id);
   } catch (error) {
     console.error('❌ Failed to initialize Firebase:', error.message);
     console.log('📝 Please ensure your Firebase service account key is properly configured');
@@ -51,6 +56,43 @@ app.get('/health', (req, res) => {
     firebase: firebaseInitialized,
     timestamp: new Date().toISOString()
   });
+});
+
+// Verify Firebase project details
+app.get('/api/firebase-info', async (req, res) => {
+  if (!firebaseInitialized) {
+    return res.status(500).json({ 
+      error: 'Firebase not initialized' 
+    });
+  }
+
+  try {
+    const projectId = admin.app().options.projectId;
+    const app = admin.app();
+    
+    // Test Firebase Messaging permissions
+    let messagingPermissions = 'Unknown';
+    try {
+      // Try to access Firebase Messaging service
+      const messaging = admin.messaging();
+      messagingPermissions = 'Available';
+    } catch (permError) {
+      messagingPermissions = `Error: ${permError.message}`;
+    }
+    
+    res.json({
+      success: true,
+      projectId: projectId,
+      serviceAccount: app.options.credential.projectId || 'Unknown',
+      messagingPermissions: messagingPermissions,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get Firebase info',
+      details: error.message
+    });
+  }
 });
 
 // Send notification to a single device
@@ -122,6 +164,11 @@ app.post('/api/send-notification', async (req, res) => {
       }
     };
 
+    console.log('🔍 Attempting to send notification...');
+    console.log('🔍 Project ID:', admin.app().options.projectId);
+    console.log('🔍 Token (first 50 chars):', token.substring(0, 50) + '...');
+    console.log('🔍 Message payload:', JSON.stringify(message, null, 2));
+
     const response = await admin.messaging().send(message);
     
     console.log('✅ Notification sent successfully:', response);
@@ -134,9 +181,13 @@ app.post('/api/send-notification', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error sending notification:', error);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Full error details:', JSON.stringify(error, null, 2));
     res.status(500).json({
       error: 'Failed to send notification',
-      details: error.message
+      details: error.message,
+      errorCode: error.code,
+      fullError: error
     });
   }
 });
