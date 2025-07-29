@@ -7,6 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import { globe, refresh, home, eye } from 'ionicons/icons';
+import { PushNotificationService } from './services/push-notification.service';
 
 @Component({
   selector: 'app-root',
@@ -20,8 +21,12 @@ export class AppComponent implements OnInit {
   loadingError = false;
   isLoading = true;
   showContent = false;
+  private clickCount = 0;
   
-  constructor(private sanitizer: DomSanitizer) {
+  constructor(
+    private sanitizer: DomSanitizer,
+    private pushNotificationService: PushNotificationService
+  ) {
     this.safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.websiteUrl);
     this.isNative = Capacitor.isNativePlatform();
     
@@ -30,14 +35,54 @@ export class AppComponent implements OnInit {
   }
 
   async ngOnInit() {
+    console.log('🚀 AppComponent ngOnInit started');
+    console.log('📱 Platform check - isNative:', this.isNative);
+    console.log('📱 Capacitor platform info:', Capacitor.getPlatform());
+    
+    // Always try to initialize push notifications for testing
+    console.log('⚙️ About to initialize push notifications...');
+    await this.initializePushNotifications();
+    
+    // Initialize push notifications on native platforms
     if (this.isNative) {
+      console.log('📱 Native platform detected, proceeding with native setup');
+      
       // On native platforms, redirect to the website URL directly
       // This uses the native WebView to load the website fullscreen
       await this.loadInNativeWebView();
     } else {
+      console.log('🌐 Web platform detected, showing iframe');
       // On web platforms, show iframe fallback
       this.showContent = true;
       this.checkUrlAccessibility();
+    }
+    
+    console.log('✅ AppComponent ngOnInit completed');
+  }
+
+  async initializePushNotifications() {
+    try {
+      console.log('🚀 App Component: Initializing push notifications for Timeless app...');
+      console.log('📱 Platform check - isNative:', this.isNative);
+      
+      // Initialize push notifications
+      console.log('⚙️ Calling pushNotificationService.initializePushNotifications()...');
+      await this.pushNotificationService.initializePushNotifications();
+      
+      console.log('🎧 Setting up listeners...');
+      this.pushNotificationService.setupListeners();
+      
+      // Wait a bit before subscribing to topic
+      console.log('⏰ Waiting 3 seconds before topic subscription...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      console.log('📡 Subscribing to topic: timeless-updates');
+      this.pushNotificationService.subscribeToTopic('timeless-updates');
+      
+      console.log('✅ Push notifications initialization completed successfully');
+    } catch (error) {
+      console.error('❌ Error initializing push notifications:', error);
+      console.error('❌ Error details:', JSON.stringify(error));
     }
   }
 
@@ -45,13 +90,13 @@ export class AppComponent implements OnInit {
     try {
       console.log('🌐 Starting native WebView load process...');
       
-      // Wait longer to ensure push notifications are initialized
-      console.log('⏰ Waiting 5 seconds to ensure push notifications are fully initialized...');
+      // Wait longer to ensure push notifications are fully initialized
+      console.log('⏰ Waiting 8 seconds to ensure push notifications are fully initialized...');
       setTimeout(() => {
-        console.log('🚀 Now redirecting to website...');
-        // Use Capacitor's native WebView to navigate to the website
+        console.log('🚀 Now redirecting to website for fullscreen experience...');
+        // Use Capacitor's native WebView to navigate to the website (fullscreen)
         window.location.href = this.websiteUrl;
-      }, 5000); // Wait 5 seconds instead of 1.5 to allow push notification setup
+      }, 8000); // Wait 8 seconds to allow push notification setup to complete
     } catch (error) {
       console.error('Error loading website in native WebView:', error);
       this.loadingError = true;
@@ -116,5 +161,28 @@ export class AppComponent implements OnInit {
     if (iframe) {
       iframe.classList.add('loaded');
     }
+  }
+
+  // Hidden method to show FCM token - can be triggered by hidden button
+  showFCMToken() {
+    this.pushNotificationService.showFCMToken();
+  }
+
+  // Hidden click handler - tap loading spinner 5 times to show FCM token
+  onLoadingClick() {
+    this.clickCount++;
+    console.log(`Loading clicked ${this.clickCount} times`);
+    
+    if (this.clickCount >= 5) {
+      this.showFCMToken();
+      this.clickCount = 0; // Reset counter
+    }
+    
+    // Reset counter after 3 seconds if not enough clicks
+    setTimeout(() => {
+      if (this.clickCount < 5) {
+        this.clickCount = 0;
+      }
+    }, 3000);
   }
 }
