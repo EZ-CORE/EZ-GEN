@@ -140,13 +140,15 @@ app.post('/api/send-notification', async (req, res) => {
       android: {
         notification: {
           sound: sound,
-          clickAction: clickAction || 'OPEN_APP',
           channelId: 'default',
-          priority: 'high'
+          priority: 'high',
+          tag: 'timeless_notification'
         },
         data: {
           ...data,
-          deepLink: deepLink || ''
+          deepLink: deepLink || '',
+          click_action: 'OPEN_APP',
+          timestamp: Date.now().toString()
         }
       },
       apns: {
@@ -393,6 +395,43 @@ app.post('/api/validate-token', async (req, res) => {
       token: req.body.token,
       error: error.message,
       checkedAt: new Date().toISOString()
+    });
+  }
+});
+
+// Register FCM token from mobile app
+app.post('/api/register-token', async (req, res) => {
+  try {
+    const { token, platform, userId, appName, timestamp } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ 
+        error: 'Token is required' 
+      });
+    }
+
+    console.log('📱 New FCM token registered:');
+    console.log('   Token (first 50 chars):', token.substring(0, 50) + '...');
+    console.log('   Platform:', platform || 'unknown');
+    console.log('   User ID:', userId || 'unknown');
+    console.log('   App:', appName || 'unknown');
+    console.log('   Timestamp:', timestamp || new Date().toISOString());
+
+    // Here you would typically save to your database
+    // For now, we'll just acknowledge the registration
+    
+    res.json({
+      success: true,
+      message: 'Token registered successfully',
+      tokenLength: token.length,
+      registeredAt: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error registering token:', error);
+    res.status(500).json({
+      error: 'Failed to register token',
+      details: error.message
     });
   }
 });
