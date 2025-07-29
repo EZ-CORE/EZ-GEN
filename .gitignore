@@ -1,3 +1,4 @@
 node_modules/
 generated-apps/
 apks/
+push-notifications-system/firebase-setup/service-account.json
