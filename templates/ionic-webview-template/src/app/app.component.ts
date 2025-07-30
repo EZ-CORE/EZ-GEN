@@ -32,6 +32,9 @@ export class AppComponent implements OnInit {
     
     // Add icons
     addIcons({ globe, refresh, home, eye });
+    
+    // Register service worker for caching
+    this.registerServiceWorker();
   }
 
   async ngOnInit() {
@@ -86,6 +89,9 @@ export class AppComponent implements OnInit {
     try {
       console.log('🌐 Starting native WebView load process...');
       
+      // Cache the website first for faster loading
+      await this.preloadWebsite();
+      
       // Reduced wait time - push notifications can initialize in background
       console.log('⏰ Waiting 2 seconds for essential initialization...');
       setTimeout(() => {
@@ -139,6 +145,47 @@ export class AppComponent implements OnInit {
         iframe.src = iframe.src; // Reload iframe
       }
       this.showContent = true;
+    }
+  }
+
+  // Register service worker for website caching
+  registerServiceWorker() {
+    if ('serviceWorker' in navigator && !this.isNative) {
+      navigator.serviceWorker.register('./assets/sw.js')
+        .then((registration) => {
+          console.log('✅ Service Worker registered successfully:', registration);
+        })
+        .catch((error) => {
+          console.error('❌ Service Worker registration failed:', error);
+        });
+    }
+  }
+
+  // Preload website for faster subsequent loads
+  async preloadWebsite() {
+    try {
+      console.log('📦 Preloading website for faster access...');
+      
+      // Create a hidden iframe to preload the website
+      const preloadFrame = document.createElement('iframe');
+      preloadFrame.style.display = 'none';
+      preloadFrame.style.position = 'absolute';
+      preloadFrame.style.width = '1px';
+      preloadFrame.style.height = '1px';
+      preloadFrame.style.opacity = '0';
+      preloadFrame.src = this.websiteUrl;
+      
+      // Add to DOM temporarily
+      document.body.appendChild(preloadFrame);
+      
+      // Remove after preload
+      setTimeout(() => {
+        document.body.removeChild(preloadFrame);
+        console.log('✅ Website preloaded and cache updated');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Error preloading website:', error);
     }
   }
 
