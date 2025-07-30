@@ -23,5 +23,9 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Splash screen timing - 2 seconds for fast loading -->
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@drawable/splash</item>
+        <item name="android:windowSplashScreenAnimationDuration" tools:targetApi="s">2000</item>
     </style>
 </resources>

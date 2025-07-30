@@ -44,7 +44,13 @@ export class AppComponent implements OnInit {
     
     // Initialize push notifications in background (non-blocking)
     console.log('⚙️ Starting push notifications initialization in background...');
-    this.initializePushNotifications(); // Remove await to make it non-blocking
+    
+    // Use setTimeout to completely detach from the main initialization flow
+    setTimeout(() => {
+      this.initializePushNotifications().catch(error => {
+        console.error('❌ Background push notification initialization failed:', error);
+      });
+    }, 2000); // 2 second delay to ensure everything is ready
     
     // Initialize push notifications on native platforms
     if (this.isNative) {
@@ -68,12 +74,9 @@ export class AppComponent implements OnInit {
       console.log('🚀 App Component: Initializing push notifications for Timeless app...');
       console.log('📱 Platform check - isNative:', this.isNative);
       
-      // Initialize push notifications
+      // Initialize push notifications - service now handles listeners internally
       console.log('⚙️ Calling pushNotificationService.initializePushNotifications()...');
       await this.pushNotificationService.initializePushNotifications();
-      
-      console.log('🎧 Setting up listeners...');
-      this.pushNotificationService.setupListeners();
       
       console.log('📡 Subscribing to topic: timeless-updates');
       this.pushNotificationService.subscribeToTopic('timeless-updates');

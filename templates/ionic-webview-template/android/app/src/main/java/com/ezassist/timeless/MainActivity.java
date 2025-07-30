@@ -124,23 +124,41 @@ public class MainActivity extends BridgeActivity {
                 return;
             }
             
-            // If there's a web link and no deep link, open the web link in browser
+            // If there's a web link, navigate within the webview (in-app)
             if (webLink != null && !webLink.isEmpty() && (deepLink == null || deepLink.isEmpty())) {
-                android.util.Log.d("MainActivity", "🌐 Opening web link in browser: " + webLink);
-                try {
-                    Intent webIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(webLink));
-                    webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(webIntent);
-                    return;
-                } catch (Exception e) {
-                    android.util.Log.e("MainActivity", "Failed to open web link: " + e.getMessage());
-                }
+                android.util.Log.d("MainActivity", "🌐 Navigating in-app to web link: " + webLink);
+                navigateInWebView(webLink);
+                return;
             }
             
             if (deepLink != null && !deepLink.isEmpty()) {
-                // Handle other deep links
                 android.util.Log.d("MainActivity", "🔗 Deep link navigation: " + deepLink);
+                if (deepLink.startsWith("http")) {
+                    navigateInWebView(deepLink);
+                } else {
+                    // Handle internal app routes
+                    android.util.Log.d("MainActivity", "📱 Internal route: " + deepLink);
+                }
             }
+        }
+    }
+    
+    private void navigateInWebView(String url) {
+        Bridge bridge = this.getBridge();
+        if (bridge != null && bridge.getWebView() != null) {
+            // Use runOnUiThread to ensure we're on the main thread
+            runOnUiThread(() -> {
+                try {
+                    // Navigate within the webview instead of opening external browser
+                    bridge.getWebView().loadUrl(url);
+                    android.util.Log.d("MainActivity", "✅ Successfully navigated to: " + url);
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "❌ Failed to navigate in webview: " + e.getMessage());
+                }
+            });
+        } else {
+            android.util.Log.e("MainActivity", "❌ WebView not available for navigation");
+        }
         }
     }
     

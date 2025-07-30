@@ -15,26 +15,58 @@ export class PushNotificationService {
     try {
       console.log('🔧 Starting push notification initialization...');
       
-      // Request permission to use push notifications
+      // Add a small delay to ensure Capacitor is fully initialized
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if we're on a supported platform
+      if (typeof window === 'undefined') {
+        console.log('⚠️ Window not available, skipping push notifications');
+        return;
+      }
+      
+      // Request permission to use push notifications with additional error handling
       console.log('📋 Requesting push notification permissions...');
-      const permission = await PushNotifications.requestPermissions();
+      let permission;
+      
+      try {
+        permission = await PushNotifications.requestPermissions();
+      } catch (permissionError) {
+        console.error('❌ Error requesting permissions:', permissionError);
+        console.log('⚠️ Falling back to setup listeners only');
+        this.setupListeners();
+        return;
+      }
       
       console.log('🔐 Permission result:', permission);
       
-      if (permission.receive === 'granted') {
+      if (permission && permission.receive === 'granted') {
         console.log('✅ Permission granted, registering for push notifications...');
         
-        // Register with Apple / Google to receive push via APNS/FCM
-        await PushNotifications.register();
-        
-        console.log('✅ Push notifications registered successfully');
-        console.log('⏳ Waiting for FCM token...');
+        try {
+          // Register with Apple / Google to receive push via APNS/FCM
+          await PushNotifications.register();
+          console.log('✅ Push notifications registered successfully');
+          console.log('⏳ Waiting for FCM token...');
+        } catch (registerError) {
+          console.error('❌ Error during registration:', registerError);
+        }
       } else {
-        console.log('❌ Push notification permission denied:', permission);
+        console.log('❌ Push notification permission denied or unavailable:', permission);
       }
+      
+      // Always setup listeners regardless of permission status
+      this.setupListeners();
+      
     } catch (error) {
       console.error('❌ Error initializing push notifications:', error);
       console.error('❌ Error details:', JSON.stringify(error));
+      
+      // Still setup listeners in case of error
+      try {
+        this.setupListeners();
+      } catch (setupError) {
+        console.error('❌ Error setting up listeners:', setupError);
+      }
     }
   }
 
@@ -134,34 +166,71 @@ export class PushNotificationService {
   }
 
   private async handleNotificationTap(notification: ActionPerformed) {
-    // Handle deep linking based on notification data - removed verbose logging to prevent alerts
+    console.log('🔔 Notification tapped, handling navigation...');
+    console.log('📋 Notification data:', notification.notification.data);
+    
+    // Get navigation data from notification
     const deepLink = notification.notification.data?.deepLink;
     const clickAction = notification.notification.data?.clickAction;
     const navigationType = notification.notification.data?.navigationType;
     const targetUrl = notification.notification.data?.targetUrl;
     const webLink = notification.notification.data?.webLink;
     
-    // Handle in-app navigation (navigate within webview)
+    console.log('🎯 Navigation details:');
+    console.log('  - Deep link:', deepLink);
+    console.log('  - Click action:', clickAction);
+    console.log('  - Navigation type:', navigationType);
+    console.log('  - Target URL:', targetUrl);
+    console.log('  - Web link:', webLink);
+    
+    // Priority 1: Handle in-app navigation (stay within webview)
     if (navigationType === 'in-app' && targetUrl) {
-      window.location.href = targetUrl;
+      console.log('📱 In-app navigation to:', targetUrl);
+      this.navigateInApp(targetUrl);
       return;
     }
     
-    // Handle web link navigation (should open in browser, but if in webview, navigate here)
-    if (webLink && !navigationType) {
-      window.location.href = webLink;
+    // Priority 2: Handle web link navigation (stay within webview)
+    if (webLink && webLink.trim() !== '') {
+      console.log('🌐 Web link navigation to:', webLink);
+      this.navigateInApp(webLink);
       return;
     }
     
-    // Handle traditional deep links
+    // Priority 3: Handle traditional deep links
     if (deepLink && deepLink.trim() !== '') {
-      // For deep links, try to navigate to the URL or use router
+      console.log('🔗 Deep link navigation to:', deepLink);
       if (deepLink.startsWith('http')) {
-        window.location.href = deepLink;
+        this.navigateInApp(deepLink);
       } else {
         // Use Angular router for internal navigation
-        this.router.navigate([deepLink]);
+        try {
+          this.router.navigate([deepLink]);
+          console.log('✅ Angular router navigation successful');
+        } catch (error) {
+          console.error('❌ Angular router navigation failed:', error);
+        }
       }
+      return;
+    }
+    
+    console.log('⚠️ No valid navigation data found in notification');
+  }
+  
+  private navigateInApp(url: string) {
+    try {
+      console.log('🚀 Navigating in-app to:', url);
+      
+      // For native platforms, the MainActivity will handle the navigation
+      // For web platforms, use window.location
+      if (window.location) {
+        window.location.href = url;
+        console.log('✅ In-app navigation successful');
+      } else {
+        console.error('❌ Window.location not available');
+      }
+    } catch (error) {
+      console.error('❌ In-app navigation failed:', error);
     }
   }
 

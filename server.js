@@ -344,6 +344,29 @@ async function updateAppConfig(appDir, config) {
     await fs.writeFile(newMainActivityPath, mainActivityContent);
   }
   
+  // Handle MyFirebaseMessagingService.java package replacement
+  const oldFirebaseServicePath = path.join(appDir, 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'MyFirebaseMessagingService.java');
+  const newFirebaseServicePath = path.join(newJavaDir, 'MyFirebaseMessagingService.java');
+  
+  let firebaseServiceContent = '';
+  if (await fs.pathExists(oldFirebaseServicePath)) {
+    firebaseServiceContent = await fs.readFile(oldFirebaseServicePath, 'utf8');
+    // Remove old Firebase service file
+    await fs.remove(oldFirebaseServicePath);
+  } else {
+    // Try to get from template
+    const templateFirebaseServicePath = path.join(__dirname, 'templates', 'ionic-webview-template', 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'MyFirebaseMessagingService.java');
+    if (await fs.pathExists(templateFirebaseServicePath)) {
+      firebaseServiceContent = await fs.readFile(templateFirebaseServicePath, 'utf8');
+    }
+  }
+  
+  if (firebaseServiceContent) {
+    firebaseServiceContent = firebaseServiceContent.replace(/package .*?;/, `package ${packageName};`);
+    firebaseServiceContent = firebaseServiceContent.replace(/\{\{PACKAGE_NAME\}\}/g, packageName);
+    await fs.writeFile(newFirebaseServicePath, firebaseServiceContent);
+  }
+  
   // Update app component to load website URL
   const appComponentPath = path.join(appDir, 'src', 'app', 'app.component.ts');
   if (await fs.pathExists(appComponentPath)) {
