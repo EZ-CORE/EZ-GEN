@@ -77,9 +77,7 @@ export class PushNotificationService {
 
     // Method called when tapping on a notification
     PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-      console.log('🔔 Notification tapped:', notification);
-      
-      // Handle deep linking
+      // Handle deep linking - removed console.log to prevent alert popups
       this.handleNotificationTap(notification);
     });
     
@@ -91,12 +89,12 @@ export class PushNotificationService {
     return this.fcmToken;
   }
 
-  // Method to show FCM token in alert (for hidden button)
+  // Method to show FCM token in console (for debugging)
   showFCMToken(): void {
     if (this.fcmToken) {
-      alert(`FCM Token:\n\n${this.fcmToken}`);
+      console.log('📱 FCM Token:', this.fcmToken);
     } else {
-      alert('FCM Token not yet available. Please wait for initialization to complete.');
+      console.log('❌ FCM Token not yet available. Please wait for initialization to complete.');
     }
   }
 
@@ -129,30 +127,41 @@ export class PushNotificationService {
 
   private handleForegroundNotification(notification: PushNotificationSchema) {
     console.log('📱 Handling foreground notification:', notification);
+    console.log('📬 New notification received:', notification.title, '-', notification.body);
     
     // You can show a toast, modal, or update your app's UI
-    // For now, we'll just log it
-    alert(`📱 New notification: ${notification.title}\n${notification.body}`);
+    // Removed alert to prevent interruption
   }
 
   private async handleNotificationTap(notification: ActionPerformed) {
-    console.log('🔔 Notification tapped with full data:', JSON.stringify(notification, null, 2));
-    
-    // Handle deep linking based on notification data
+    // Handle deep linking based on notification data - removed verbose logging to prevent alerts
     const deepLink = notification.notification.data?.deepLink;
     const clickAction = notification.notification.data?.clickAction;
+    const navigationType = notification.notification.data?.navigationType;
+    const targetUrl = notification.notification.data?.targetUrl;
+    const webLink = notification.notification.data?.webLink;
     
-    console.log('🔀 Deep link:', deepLink);
-    console.log('🎯 Click action:', clickAction);
-    console.log('📱 Notification tapped - handling navigation');
+    // Handle in-app navigation (navigate within webview)
+    if (navigationType === 'in-app' && targetUrl) {
+      window.location.href = targetUrl;
+      return;
+    }
     
-    // Handle navigation immediately without alert
+    // Handle web link navigation (should open in browser, but if in webview, navigate here)
+    if (webLink && !navigationType) {
+      window.location.href = webLink;
+      return;
+    }
+    
+    // Handle traditional deep links
     if (deepLink && deepLink.trim() !== '') {
-      console.log('🌐 Opening deep link:', deepLink);
-      window.location.href = deepLink;
-    } else {
-      console.log('🏠 Reloading main app website');
-      window.location.reload();
+      // For deep links, try to navigate to the URL or use router
+      if (deepLink.startsWith('http')) {
+        window.location.href = deepLink;
+      } else {
+        // Use Angular router for internal navigation
+        this.router.navigate([deepLink]);
+      }
     }
   }
 

@@ -115,7 +115,7 @@ export class PushNotificationService {
   private async sendTokenToServer(token: string) {
     try {
       // Send token to your server
-      const response = await fetch('http://localhost:3001/api/register-token', {
+      const response = await fetch('http://localhost:3002/api/register-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,8 +141,9 @@ export class PushNotificationService {
   private handleForegroundNotification(notification: PushNotificationSchema) {
     // You can show a local notification or update your app's UI
     console.log('Handling foreground notification:', notification);
+    console.log('New notification received:', notification.title, '-', notification.body);
     
-    // Example: Show a toast or modal
+    // Example: Show a toast or modal instead of alert
     // this.toastController.create({...}).then(toast => toast.present());
   }
 
@@ -152,10 +153,32 @@ export class PushNotificationService {
     // Handle deep linking based on notification data
     const deepLink = notification.notification.data?.deepLink;
     const clickAction = notification.notification.data?.clickAction;
+    const navigationType = notification.notification.data?.navigationType;
+    const targetUrl = notification.notification.data?.targetUrl;
+    const webLink = notification.notification.data?.webLink;
     
+    // Handle in-app navigation (navigate within webview)
+    if (navigationType === 'in-app' && targetUrl) {
+      console.log('In-app navigation to:', targetUrl);
+      window.location.href = targetUrl;
+      return;
+    }
+    
+    // Handle web link navigation
+    if (webLink && !navigationType) {
+      console.log('Web link navigation to:', webLink);
+      window.location.href = webLink;
+      return;
+    }
+    
+    // Handle traditional deep links
     if (deepLink) {
-      // Navigate to specific page
-      this.router.navigate([deepLink]);
+      if (deepLink.startsWith('http')) {
+        window.location.href = deepLink;
+      } else {
+        // Use Angular router for internal navigation
+        this.router.navigate([deepLink]);
+      }
     } else if (clickAction === 'OPEN_APP') {
       // Just open the app (default behavior)
       this.router.navigate(['/home']);
@@ -176,7 +199,7 @@ export class PushNotificationService {
   async subscribeToTopic(topic: string) {
     try {
       // You'll need to call your server to subscribe the current token to a topic
-      const response = await fetch('http://localhost:3001/api/subscribe-to-topic', {
+      const response = await fetch('http://localhost:3002/api/subscribe-to-topic', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

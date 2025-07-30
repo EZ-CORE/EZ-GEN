@@ -78,15 +78,45 @@ public class MainActivity extends BridgeActivity {
             String deepLink = intent.getStringExtra("deepLink");
             String webLink = intent.getStringExtra("webLink");
             String clickAction = intent.getStringExtra("clickAction");
+            String navigationType = intent.getStringExtra("navigationType");
+            String targetUrl = intent.getStringExtra("targetUrl");
+            String industry = intent.getStringExtra("industry");
             
             android.util.Log.d("MainActivity", "🔔 Notification clicked!");
             android.util.Log.d("MainActivity", "Deep link: " + deepLink);
             android.util.Log.d("MainActivity", "Web link: " + webLink);
             android.util.Log.d("MainActivity", "Click action: " + clickAction);
+            android.util.Log.d("MainActivity", "Navigation type: " + navigationType);
+            android.util.Log.d("MainActivity", "Target URL: " + targetUrl);
+            android.util.Log.d("MainActivity", "Industry: " + industry);
             
-            // If there's a web link and no deep link, open the web link
+            // Handle in-app navigation (navigate within the webview)
+            if ("in-app".equals(navigationType) && targetUrl != null && !targetUrl.isEmpty()) {
+                android.util.Log.d("MainActivity", "📱 In-app navigation to: " + targetUrl);
+                
+                // Navigate to the target URL within the webview
+                Bridge bridge = this.getBridge();
+                if (bridge != null && bridge.getWebView() != null) {
+                    // Post to UI thread to ensure webview is ready
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                // Load the target URL in the webview
+                                bridge.getWebView().loadUrl(targetUrl);
+                                android.util.Log.d("MainActivity", "✅ Successfully navigated to: " + targetUrl);
+                            } catch (Exception e) {
+                                android.util.Log.e("MainActivity", "❌ Failed to navigate in webview: " + e.getMessage());
+                            }
+                        }
+                    });
+                }
+                return;
+            }
+            
+            // If there's a web link and no deep link, open the web link in browser
             if (webLink != null && !webLink.isEmpty() && (deepLink == null || deepLink.isEmpty())) {
-                android.util.Log.d("MainActivity", "🌐 Opening web link: " + webLink);
+                android.util.Log.d("MainActivity", "🌐 Opening web link in browser: " + webLink);
                 try {
                     Intent webIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(webLink));
                     webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -98,8 +128,8 @@ public class MainActivity extends BridgeActivity {
             }
             
             if (deepLink != null && !deepLink.isEmpty()) {
-                // Handle deep link - for now just log it
-                android.util.Log.d("MainActivity", "🌐 Would navigate to: " + deepLink);
+                // Handle other deep links
+                android.util.Log.d("MainActivity", "🔗 Deep link navigation: " + deepLink);
             }
         }
     }

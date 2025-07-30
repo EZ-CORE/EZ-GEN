@@ -72,10 +72,6 @@ export class AppComponent implements OnInit {
       console.log('🎧 Setting up listeners...');
       this.pushNotificationService.setupListeners();
       
-      // Wait a bit before subscribing to topic
-      console.log('⏰ Waiting 3 seconds before topic subscription...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
       console.log('📡 Subscribing to topic: timeless-updates');
       this.pushNotificationService.subscribeToTopic('timeless-updates');
       

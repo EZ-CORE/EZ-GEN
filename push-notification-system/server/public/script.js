@@ -100,6 +100,7 @@ async function handleSingleNotification(event) {
         imageUrl: document.getElementById('notification-image').value || undefined,
         sound: document.getElementById('notification-sound').value,
         deepLink: document.getElementById('deep-link').value || undefined,
+        webLink: document.getElementById('web-link').value || undefined,
         data: {}
     };
     
@@ -206,7 +207,8 @@ async function handleTopicNotification(event) {
         body: document.getElementById('topic-body').value,
         imageUrl: document.getElementById('topic-image').value || undefined,
         sound: document.getElementById('topic-sound').value,
-        deepLink: document.getElementById('topic-deep-link').value || undefined
+        deepLink: document.getElementById('topic-deep-link').value || undefined,
+        webLink: document.getElementById('topic-web-link').value || undefined
     };
     
     const submitButton = event.target.querySelector('button[type="submit"]');
@@ -314,6 +316,88 @@ async function sendQuickTest(type) {
             body: 'Discover amazing dessert businesses and sweet treats available now!',
             webLink: 'https://timeless.ezassist.me/?industry=DESSERTS'
             // No deepLink intentionally - this will make the action button more prominent
+        },
+        // In-App Navigation Notifications (opens specific pages within the app)
+        desserts_inapp: {
+            title: '🍰 Sweet Dessert Deals!',
+            body: 'Check out amazing dessert options in your area!',
+            deepLink: 'timeless://industry?category=DESSERTS',
+            data: {
+                navigationType: 'in-app',
+                targetUrl: 'https://timeless.ezassist.me/?industry=DESSERTS',
+                industry: 'DESSERTS'
+            }
+        },
+        western_delights: {
+            title: '🤠 Western Delights Await!',
+            body: 'Explore authentic Western cuisine and delights!',
+            deepLink: 'timeless://industry?category=Western%20Delights',
+            data: {
+                navigationType: 'in-app',
+                targetUrl: 'https://timeless.ezassist.me/?industry=Western%20Delights',
+                industry: 'Western Delights'
+            }
+        },
+        restaurants_inapp: {
+            title: '🍽️ Great Restaurant Finds!',
+            body: 'Discover top-rated restaurants near you!',
+            deepLink: 'timeless://industry?category=RESTAURANTS',
+            data: {
+                navigationType: 'in-app',
+                targetUrl: 'https://timeless.ezassist.me/?industry=RESTAURANTS',
+                industry: 'RESTAURANTS'
+            }
+        },
+        retail_inapp: {
+            title: '🛍️ Amazing Retail Stores!',
+            body: 'Browse the best retail shopping options!',
+            deepLink: 'timeless://industry?category=RETAIL',
+            data: {
+                navigationType: 'in-app',
+                targetUrl: 'https://timeless.ezassist.me/?industry=RETAIL',
+                industry: 'RETAIL'
+            }
+        },
+        services_inapp: {
+            title: '🔧 Professional Services!',
+            body: 'Connect with trusted service providers!',
+            deepLink: 'timeless://industry?category=SERVICES',
+            data: {
+                navigationType: 'in-app',
+                targetUrl: 'https://timeless.ezassist.me/?industry=SERVICES',
+                industry: 'SERVICES'
+            }
+        },
+        homepage_inapp: {
+            title: '🏠 Welcome Home!',
+            body: 'Explore all available business categories!',
+            deepLink: 'timeless://home',
+            data: {
+                navigationType: 'in-app',
+                targetUrl: 'https://timeless.ezassist.me/',
+                industry: 'HOME'
+            }
+        },
+        // Browser navigation (existing)
+        restaurants: {
+            title: '🍽️ Find Great Restaurants!',
+            body: 'Explore top-rated restaurants and dining options in your area!',
+            webLink: 'https://timeless.ezassist.me/?industry=RESTAURANTS'
+        },
+        retail: {
+            title: '🛍️ Shop Retail Stores!',
+            body: 'Browse amazing retail stores and shopping opportunities!',
+            webLink: 'https://timeless.ezassist.me/?industry=RETAIL'
+        },
+        services: {
+            title: '🔧 Professional Services!',
+            body: 'Connect with trusted professional service providers!',
+            webLink: 'https://timeless.ezassist.me/?industry=SERVICES'
+        },
+        homepage: {
+            title: '🏠 Visit Our Homepage!',
+            body: 'Explore all business categories and discover what\'s available!',
+            webLink: 'https://timeless.ezassist.me/'
         }
     };
     
