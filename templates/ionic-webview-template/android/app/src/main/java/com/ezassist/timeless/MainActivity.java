@@ -3,6 +3,7 @@ package com.ezassist.timeless;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -75,11 +76,26 @@ public class MainActivity extends BridgeActivity {
     private void handleNotificationIntent(Intent intent) {
         if (intent != null && intent.getExtras() != null) {
             String deepLink = intent.getStringExtra("deepLink");
+            String webLink = intent.getStringExtra("webLink");
             String clickAction = intent.getStringExtra("clickAction");
             
             android.util.Log.d("MainActivity", "🔔 Notification clicked!");
             android.util.Log.d("MainActivity", "Deep link: " + deepLink);
+            android.util.Log.d("MainActivity", "Web link: " + webLink);
             android.util.Log.d("MainActivity", "Click action: " + clickAction);
+            
+            // If there's a web link and no deep link, open the web link
+            if (webLink != null && !webLink.isEmpty() && (deepLink == null || deepLink.isEmpty())) {
+                android.util.Log.d("MainActivity", "🌐 Opening web link: " + webLink);
+                try {
+                    Intent webIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(webLink));
+                    webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(webIntent);
+                    return;
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "Failed to open web link: " + e.getMessage());
+                }
+            }
             
             if (deepLink != null && !deepLink.isEmpty()) {
                 // Handle deep link - for now just log it

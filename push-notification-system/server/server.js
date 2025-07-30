@@ -114,7 +114,8 @@ app.post('/api/send-notification', async (req, res) => {
       sound = 'default',
       badge,
       clickAction,
-      deepLink
+      deepLink,
+      webLink
     } = req.body;
 
     if (!token || !title || !body) {
@@ -122,6 +123,15 @@ app.post('/api/send-notification', async (req, res) => {
         error: 'Missing required fields: token, title, body' 
       });
     }
+
+    // Helper function to ensure all data values are strings (Firebase requirement)
+    const stringifyData = (obj) => {
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = String(value);
+      }
+      return result;
+    };
 
     // Prepare notification payload
     const message = {
@@ -131,12 +141,13 @@ app.post('/api/send-notification', async (req, res) => {
         body: body,
         imageUrl: imageUrl || undefined
       },
-      data: {
+      data: stringifyData({
         ...data,
         deepLink: deepLink || '',
+        webLink: webLink || '',
         clickAction: clickAction || 'OPEN_APP',
         timestamp: Date.now().toString()
-      },
+      }),
       android: {
         notification: {
           sound: sound,
@@ -144,12 +155,13 @@ app.post('/api/send-notification', async (req, res) => {
           priority: 'high',
           tag: 'timeless_notification'
         },
-        data: {
+        data: stringifyData({
           ...data,
           deepLink: deepLink || '',
+          webLink: webLink || '',
           click_action: 'OPEN_APP',
           timestamp: Date.now().toString()
-        }
+        })
       },
       apns: {
         payload: {
@@ -224,16 +236,25 @@ app.post('/api/send-bulk-notifications', async (req, res) => {
       });
     }
 
+    // Helper function to ensure all data values are strings (Firebase requirement)
+    const stringifyData = (obj) => {
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = String(value);
+      }
+      return result;
+    };
+
     const message = {
       notification: {
         title: title,
         body: body,
         imageUrl: imageUrl || undefined
       },
-      data: {
+      data: stringifyData({
         ...data,
         timestamp: Date.now().toString()
-      },
+      }),
       android: {
         notification: {
           sound: sound,
@@ -293,7 +314,8 @@ app.post('/api/send-topic-notification', async (req, res) => {
       data = {},
       imageUrl,
       sound = 'default',
-      deepLink
+      deepLink,
+      webLink
     } = req.body;
 
     if (!topic || !title || !body) {
@@ -302,6 +324,15 @@ app.post('/api/send-topic-notification', async (req, res) => {
       });
     }
 
+    // Helper function to ensure all data values are strings (Firebase requirement)
+    const stringifyData = (obj) => {
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = String(value);
+      }
+      return result;
+    };
+
     const message = {
       topic: topic,
       notification: {
@@ -309,11 +340,12 @@ app.post('/api/send-topic-notification', async (req, res) => {
         body: body,
         imageUrl: imageUrl || undefined
       },
-      data: {
+      data: stringifyData({
         ...data,
         deepLink: deepLink || '',
+        webLink: webLink || '',
         timestamp: Date.now().toString()
-      },
+      }),
       android: {
         notification: {
           sound: sound,

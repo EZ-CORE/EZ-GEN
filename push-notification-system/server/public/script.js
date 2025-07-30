@@ -308,6 +308,12 @@ async function sendQuickTest(type) {
             body: 'We have something exciting to show you.',
             imageUrl: 'https://picsum.photos/400/300',
             deepLink: '/gallery'
+        },
+        weblink: {
+            title: '🍰 Check Out Dessert Options!',
+            body: 'Discover amazing dessert businesses and sweet treats available now!',
+            webLink: 'https://timeless.ezassist.me/?industry=DESSERTS'
+            // No deepLink intentionally - this will make the action button more prominent
         }
     };
     

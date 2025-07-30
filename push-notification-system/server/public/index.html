@@ -69,7 +69,13 @@
                     <div class="form-group">
                         <label for="deep-link">Deep Link (optional)</label>
                         <input type="text" id="deep-link" placeholder="/home, /profile, /settings">
-                        <small>Page to open when notification is tapped</small>
+                        <small>In-app page to open when notification is tapped</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="web-link">Web Link (optional)</label>
+                        <input type="url" id="web-link" placeholder="https://example.com">
+                        <small>Website URL to open in browser - adds "Open Link" action button</small>
                     </div>
 
                     <div class="form-group">
@@ -161,6 +167,13 @@
                     <div class="form-group">
                         <label for="topic-deep-link">Deep Link (optional)</label>
                         <input type="text" id="topic-deep-link" placeholder="/news, /updates">
+                        <small>In-app page to open when notification is tapped</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="topic-web-link">Web Link (optional)</label>
+                        <input type="url" id="topic-web-link" placeholder="https://example.com">
+                        <small>Website URL to open in browser - adds "Open Link" action button</small>
                     </div>
 
                     <button type="submit" class="btn btn-primary">📡 Send to Topic</button>
@@ -205,6 +218,9 @@
                 </button>
                 <button class="btn btn-quick" onclick="sendQuickTest('image')">
                     🖼️ With Image
+                </button>
+                <button class="btn btn-quick" onclick="sendQuickTest('weblink')">
+                    🌐 Web Link
                 </button>
             </div>
         </div>
