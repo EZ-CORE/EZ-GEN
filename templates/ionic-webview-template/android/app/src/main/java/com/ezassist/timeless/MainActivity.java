@@ -57,9 +57,19 @@ public class MainActivity extends BridgeActivity {
             webSettings.setBuiltInZoomControls(true);
             webSettings.setDisplayZoomControls(false);
             
-            // Improve loading performance
+            // Enhanced caching for faster loading
             webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
-            // Note: setAppCacheEnabled is deprecated in API 33+
+            webSettings.setDatabaseEnabled(true);
+            webSettings.setDomStorageEnabled(true);
+            
+            // Enable additional caching mechanisms
+            String cacheDirPath = getCacheDir().getAbsolutePath();
+            webSettings.setDatabasePath(cacheDirPath);
+            
+            // Optimize loading performance
+            webSettings.setRenderPriority(WebSettings.RenderPriority.HIGH);
+            webSettings.setLoadWithOverviewMode(true);
+            webSettings.setUseWideViewPort(true);
             
             // Set user agent to help with compatibility
             String userAgent = webSettings.getUserAgentString();

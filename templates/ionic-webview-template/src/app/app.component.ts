@@ -39,9 +39,9 @@ export class AppComponent implements OnInit {
     console.log('📱 Platform check - isNative:', this.isNative);
     console.log('📱 Capacitor platform info:', Capacitor.getPlatform());
     
-    // Always try to initialize push notifications for testing
-    console.log('⚙️ About to initialize push notifications...');
-    await this.initializePushNotifications();
+    // Initialize push notifications in background (non-blocking)
+    console.log('⚙️ Starting push notifications initialization in background...');
+    this.initializePushNotifications(); // Remove await to make it non-blocking
     
     // Initialize push notifications on native platforms
     if (this.isNative) {
@@ -86,13 +86,13 @@ export class AppComponent implements OnInit {
     try {
       console.log('🌐 Starting native WebView load process...');
       
-      // Wait longer to ensure push notifications are fully initialized
-      console.log('⏰ Waiting 8 seconds to ensure push notifications are fully initialized...');
+      // Reduced wait time - push notifications can initialize in background
+      console.log('⏰ Waiting 2 seconds for essential initialization...');
       setTimeout(() => {
         console.log('🚀 Now redirecting to website for fullscreen experience...');
         // Use Capacitor's native WebView to navigate to the website (fullscreen)
         window.location.href = this.websiteUrl;
-      }, 8000); // Wait 8 seconds to allow push notification setup to complete
+      }, 2000); // Reduced from 8 seconds to 2 seconds
     } catch (error) {
       console.error('Error loading website in native WebView:', error);
       this.loadingError = true;
