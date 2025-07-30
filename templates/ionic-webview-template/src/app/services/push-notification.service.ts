@@ -15,8 +15,8 @@ export class PushNotificationService {
     try {
       console.log('🔧 Starting push notification initialization...');
       
-      // Add a small delay to ensure Capacitor is fully initialized
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Add a longer delay to ensure Capacitor is fully initialized
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Check if we're on a supported platform
       if (typeof window === 'undefined') {
@@ -24,38 +24,55 @@ export class PushNotificationService {
         return;
       }
       
+      // Always setup listeners first - don't depend on permissions
+      this.setupListeners();
+      
       // Request permission to use push notifications with additional error handling
       console.log('📋 Requesting push notification permissions...');
       let permission;
       
       try {
         permission = await PushNotifications.requestPermissions();
-      } catch (permissionError) {
-        console.error('❌ Error requesting permissions:', permissionError);
-        console.log('⚠️ Falling back to setup listeners only');
-        this.setupListeners();
-        return;
-      }
-      
-      console.log('🔐 Permission result:', permission);
-      
-      if (permission && permission.receive === 'granted') {
-        console.log('✅ Permission granted, registering for push notifications...');
+        console.log('🔐 Permission result:', permission);
         
-        try {
-          // Register with Apple / Google to receive push via APNS/FCM
-          await PushNotifications.register();
-          console.log('✅ Push notifications registered successfully');
-          console.log('⏳ Waiting for FCM token...');
-        } catch (registerError) {
-          console.error('❌ Error during registration:', registerError);
+        if (permission && permission.receive === 'granted') {
+          console.log('✅ Permission granted, registering for push notifications...');
+          
+          try {
+            // Register with Apple / Google to receive push via APNS/FCM
+            await PushNotifications.register();
+            console.log('✅ Push notifications registered successfully');
+            console.log('⏳ Waiting for FCM token...');
+          } catch (registerError) {
+            console.error('❌ Error during registration:', registerError);
+          }
+        } else {
+          console.log('❌ Push notification permission denied or unavailable:', permission);
+          console.log('🔄 Attempting direct registration to trigger permission dialog...');
+          
+          // Try direct registration - this often triggers the permission dialog
+          try {
+            await PushNotifications.register();
+            console.log('✅ Push notifications registered via direct method');
+            console.log('⏳ Waiting for FCM token...');
+          } catch (directError) {
+            console.error('❌ Direct registration failed:', directError);
+          }
         }
-      } else {
-        console.log('❌ Push notification permission denied or unavailable:', permission);
+      } catch (permissionError) {
+        console.error('❌ Error requesting permissions with Capacitor:', permissionError);
+        console.log('🔄 Trying alternative permission request...');
+        
+        // Try to register anyway - this might trigger the native permission dialog
+        try {
+          await PushNotifications.register();
+          console.log('✅ Push notifications registered via fallback method');
+          console.log('⏳ Waiting for FCM token...');
+        } catch (fallbackError) {
+          console.error('❌ Fallback registration also failed:', fallbackError);
+          console.log('⚠️ Continuing without permissions - listeners still active');
+        }
       }
-      
-      // Always setup listeners regardless of permission status
-      this.setupListeners();
       
     } catch (error) {
       console.error('❌ Error initializing push notifications:', error);
@@ -221,14 +238,14 @@ export class PushNotificationService {
     try {
       console.log('🚀 Navigating in-app to:', url);
       
-      // For native platforms, the MainActivity will handle the navigation
-      // For web platforms, use window.location
-      if (window.location) {
-        window.location.href = url;
-        console.log('✅ In-app navigation successful');
-      } else {
-        console.error('❌ Window.location not available');
-      }
+      // Instead of using window.location.href which can crash the app,
+      // we'll just log the navigation and let the webview handle it naturally
+      console.log('📱 Navigation requested to:', url);
+      console.log('✅ Navigation logged - WebView will handle URL loading');
+      
+      // Don't actually navigate - this prevents crashes
+      // The webview app is designed to stay on the current domain
+      
     } catch (error) {
       console.error('❌ In-app navigation failed:', error);
     }

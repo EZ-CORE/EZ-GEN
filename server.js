@@ -367,6 +367,27 @@ async function updateAppConfig(appDir, config) {
     await fs.writeFile(newFirebaseServicePath, firebaseServiceContent);
   }
   
+  // Copy Firebase configuration file for FCM support
+  const templateFirebaseConfigPath = path.join(__dirname, 'templates', 'ionic-webview-template', 'android', 'app', 'google-services.json');
+  const newFirebaseConfigPath = path.join(appDir, 'android', 'app', 'google-services.json');
+  
+  if (await fs.pathExists(templateFirebaseConfigPath)) {
+    // Read the template Firebase config
+    let firebaseConfig = await fs.readFile(templateFirebaseConfigPath, 'utf8');
+    
+    // Update the package name in Firebase config
+    firebaseConfig = firebaseConfig.replace(
+      /"package_name": "com\.ezassist\.timeless"/g,
+      `"package_name": "${packageName}"`
+    );
+    
+    // Write the updated Firebase config to the new app
+    await fs.writeFile(newFirebaseConfigPath, firebaseConfig);
+    console.log(`🔥 Firebase configuration copied and updated for package: ${packageName}`);
+  } else {
+    console.warn('⚠️ Firebase configuration template not found. FCM notifications may not work.');
+  }
+  
   // Update app component to load website URL
   const appComponentPath = path.join(appDir, 'src', 'app', 'app.component.ts');
   if (await fs.pathExists(appComponentPath)) {
