@@ -14,7 +14,32 @@ A white-label app generator that creates native Android/iOS apps from any websit
    npm start
    ```
 
-3. **Open in browser:**
+3. **⚠️ IMPORTANT: First-time setup required**
+   
+   **Create Firebase project (Required for notifications):**
+   1. Go to https://console.firebase.google.com
+   2. Create a new project
+   3. Enable Cloud Messaging
+   4. Download `google-services.json` (Android) and `GoogleService-Info.plist` (iOS)
+   5. Place files in template directories:
+      ```
+      templates/ionic-webview-template/android/app/google-services.json
+      templates/ionic-webview-template/ios/App/GoogleService-Info.plist
+      ```
+
+   **Create environment file:**
+   ```bash
+   # Create .env file in project root
+   echo "PORT=3002" > .env
+   echo "NODE_ENV=development" >> .env
+   ```
+
+   **Create required directories:**
+   ```bash
+   mkdir uploads generated-apps temp
+   ```
+
+4. **Open in browser:**
    Navigate to `http://localhost:3000`
 
 ## Features
@@ -100,6 +125,29 @@ See `GRADLE_FIX_NOTES.md` for detailed information about this fix.
 - Ionic CLI: `npm install -g @ionic/cli`
 - For Android: Android Studio
 - For iOS: Xcode (macOS only)
+
+## 🔧 Manual Setup Requirements
+
+**Critical files excluded from Git (for security):**
+
+1. **Firebase configuration files** (get from Firebase Console):
+   - `templates/ionic-webview-template/android/app/google-services.json`
+   - `templates/ionic-webview-template/ios/App/GoogleService-Info.plist`
+
+2. **Environment variables** (create `.env` file):
+   ```bash
+   PORT=3002
+   NODE_ENV=development
+   FIREBASE_PROJECT_ID=your-project-id
+   ```
+
+3. **Required directories** (create manually):
+   ```bash
+   mkdir uploads generated-apps temp
+   ```
+
+4. **Android signing keys** (for production builds):
+   - Generate with: `keytool -genkey -v -keystore release-key.keystore`
 
 See `DOC.md` for detailed documentation.
 

@@ -82,9 +82,10 @@ EZ-GEN/
 - Node.js (v16 or higher)
 - npm or yarn
 - Ionic CLI: `npm install -g @ionic/cli`
+- Capacitor CLI: `npm install -g @capacitor/cli`
 
 ### For Mobile Development
-- **Android**: Android Studio + Android SDK
+- **Android**: Android Studio + Android SDK (API 33+)
 - **iOS**: Xcode (macOS only)
 
 ### Installation Steps
@@ -95,22 +96,62 @@ git clone https://github.com/yourusername/EZ-GEN.git
 cd EZ-GEN
 ```
 
-2. **Install dependencies:**
+2. **Install project dependencies:**
 ```bash
 npm install
 ```
 
-3. **Set up the Ionic template (if not already done):**
+3. **Create the Ionic template (REQUIRED):**
 ```bash
 cd templates
-ionic start ionic-webview-template blank --type=angular --no-git
+ionic start ionic-webview-template blank --type=angular --capacitor --no-git
 cd ionic-webview-template
+
+# Add mobile platforms
 ionic capacitor add android
 ionic capacitor add ios
+
+# Install required Capacitor plugins
+npm install @capacitor/push-notifications @capacitor/app @capacitor/browser
+
+# Return to project root
 cd ../..
 ```
 
-4. **Start the development server:**
+4. **Set up Android development environment:**
+```bash
+# Install Android Studio and SDK
+# Set ANDROID_HOME environment variable
+# Accept SDK licenses
+sdkmanager --licenses
+```
+
+5. **Set up iOS development (macOS only):**
+```bash
+# Install Xcode from App Store
+xcode-select --install
+sudo xcodebuild -license accept
+```
+
+6. **Configure Firebase for push notifications (optional):**
+   - Create project at https://console.firebase.google.com
+   - Download `google-services.json` for Android
+   - Download `GoogleService-Info.plist` for iOS
+   - Place in template platform directories
+
+7. **Create uploads directory:**
+```bash
+mkdir uploads
+```
+
+8. **Copy template customizations:**
+```bash
+# Copy the pre-configured files from the repo to your template
+cp -r templates/ionic-webview-template/src/* templates/ionic-webview-template/src/
+cp -r templates/ionic-webview-template/android/* templates/ionic-webview-template/android/
+```
+
+9. **Start the development server:**
 ```bash
 npm start
 ```
@@ -144,7 +185,51 @@ Download generated app package
 
 ---
 
-## 📖 Usage Instructions
+## � Troubleshooting
+
+### Common Setup Issues
+
+**1. "ionic command not found"**
+```bash
+npm install -g @ionic/cli @capacitor/cli
+```
+
+**2. "Android SDK not found"**
+- Install Android Studio
+- Set ANDROID_HOME environment variable
+- Add to PATH: `$ANDROID_HOME/tools`, `$ANDROID_HOME/platform-tools`
+
+**3. "Template generation fails"**
+```bash
+# Clean and retry
+rm -rf templates/ionic-webview-template
+cd templates
+ionic start ionic-webview-template blank --type=angular --capacitor
+```
+
+**4. "Build fails with Capacitor errors"**
+```bash
+# Sync Capacitor after changes
+cd templates/ionic-webview-template
+npx cap sync
+```
+
+**5. "Push notifications not working"**
+- Ensure Firebase configuration files are in place
+- Check Android package name matches Firebase project
+- Verify notification permissions in Android settings
+
+### Required Manual Files
+
+After cloning, ensure these files exist in your template:
+- `templates/ionic-webview-template/src/app/services/push-notification.service.ts`
+- `templates/ionic-webview-template/android/app/src/main/java/io/ionic/starter/MainActivity.java`
+- `templates/ionic-webview-template/android/app/google-services.json` (for Firebase)
+- `templates/ionic-webview-template/ios/App/GoogleService-Info.plist` (for Firebase)
+
+---
+
+## �📖 Usage Instructions
 
 ### For End Users
 1. Open the web interface
