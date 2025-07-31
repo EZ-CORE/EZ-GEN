@@ -24,6 +24,9 @@ A white-label app generator that creates native Android/iOS apps from any websit
 - ✅ Download ready-to-build Ionic projects
 - ✅ Support for both Android and iOS
 - ✅ Beautiful web interface
+- ✅ **Firebase Cloud Messaging (FCM) notifications**
+- ✅ **Automatic Android 13+ permission handling**
+- ✅ **Play Store-ready builds with automatic signing**
 
 ## How to Build Generated Apps
 
@@ -99,3 +102,23 @@ See `GRADLE_FIX_NOTES.md` for detailed information about this fix.
 - For iOS: Xcode (macOS only)
 
 See `DOC.md` for detailed documentation.
+
+## 🔔 Notification Features
+
+Every generated app automatically includes:
+
+- **Firebase Cloud Messaging (FCM)** for push notifications
+- **Android 13+ permission handling** with automatic dialog prompts
+- **Multiple fallback strategies** to ensure permission requests work
+- **Manual permission button** for user-triggered requests
+- **Comprehensive error handling** and debugging logs
+
+### Testing Notifications:
+
+1. **Install the generated APK** on your device
+2. **Permission dialog** should appear on first launch
+3. **Check console logs** for FCM token generation
+4. **Use the floating notification button** if needed
+5. **Send test notifications** via Firebase Console
+
+See `NOTIFICATION-PERMISSION-TROUBLESHOOTING.md` in generated apps for detailed debugging.

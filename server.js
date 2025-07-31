@@ -324,18 +324,21 @@ async function updateAppConfig(appDir, config) {
   // Ensure new package directory exists
   await fs.ensureDir(newJavaDir);
   
-  // Read MainActivity content (either from old location or template)
+  // Read MainActivity content (prioritize template over existing file)
   let mainActivityContent = '';
-  if (await fs.pathExists(oldMainActivityPath)) {
+  const templateMainActivityPath = path.join(__dirname, 'templates', 'ionic-webview-template', 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'MainActivity.java');
+  
+  if (await fs.pathExists(templateMainActivityPath)) {
+    mainActivityContent = await fs.readFile(templateMainActivityPath, 'utf8');
+    console.log('📱 Using template MainActivity.java');
+  } else if (await fs.pathExists(oldMainActivityPath)) {
     mainActivityContent = await fs.readFile(oldMainActivityPath, 'utf8');
-    // Remove old MainActivity
+    console.log('⚠️ Using existing MainActivity.java from app directory');
+  }
+  
+  // Remove old MainActivity if it exists
+  if (await fs.pathExists(oldMainActivityPath)) {
     await fs.remove(oldMainActivityPath);
-  } else {
-    // Read from template
-    const templateMainActivityPath = path.join(__dirname, 'templates', 'ionic-webview-template', 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'MainActivity.java');
-    if (await fs.pathExists(templateMainActivityPath)) {
-      mainActivityContent = await fs.readFile(templateMainActivityPath, 'utf8');
-    }
   }
   
   // Update package declaration
@@ -349,22 +352,52 @@ async function updateAppConfig(appDir, config) {
   const newFirebaseServicePath = path.join(newJavaDir, 'MyFirebaseMessagingService.java');
   
   let firebaseServiceContent = '';
-  if (await fs.pathExists(oldFirebaseServicePath)) {
+  // Always try to get from template first
+  const templateFirebaseServicePath = path.join(__dirname, 'templates', 'ionic-webview-template', 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'MyFirebaseMessagingService.java');
+  if (await fs.pathExists(templateFirebaseServicePath)) {
+    firebaseServiceContent = await fs.readFile(templateFirebaseServicePath, 'utf8');
+    console.log('🔥 Using template MyFirebaseMessagingService.java');
+  } else if (await fs.pathExists(oldFirebaseServicePath)) {
     firebaseServiceContent = await fs.readFile(oldFirebaseServicePath, 'utf8');
-    // Remove old Firebase service file
+    console.log('⚠️ Using existing MyFirebaseMessagingService.java from app directory');
+  }
+  
+  // Remove old Firebase service file if it exists
+  if (await fs.pathExists(oldFirebaseServicePath)) {
     await fs.remove(oldFirebaseServicePath);
-  } else {
-    // Try to get from template
-    const templateFirebaseServicePath = path.join(__dirname, 'templates', 'ionic-webview-template', 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'MyFirebaseMessagingService.java');
-    if (await fs.pathExists(templateFirebaseServicePath)) {
-      firebaseServiceContent = await fs.readFile(templateFirebaseServicePath, 'utf8');
-    }
   }
   
   if (firebaseServiceContent) {
     firebaseServiceContent = firebaseServiceContent.replace(/package .*?;/, `package ${packageName};`);
     firebaseServiceContent = firebaseServiceContent.replace(/\{\{PACKAGE_NAME\}\}/g, packageName);
     await fs.writeFile(newFirebaseServicePath, firebaseServiceContent);
+  }
+  
+  // Handle NotificationPermissionHelper.java package replacement
+  const oldNotificationHelperPath = path.join(appDir, 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'NotificationPermissionHelper.java');
+  const newNotificationHelperPath = path.join(newJavaDir, 'NotificationPermissionHelper.java');
+  
+  let notificationHelperContent = '';
+  // Always try to get from template first
+  const templateNotificationHelperPath = path.join(__dirname, 'templates', 'ionic-webview-template', 'android', 'app', 'src', 'main', 'java', 'io', 'ionic', 'starter', 'NotificationPermissionHelper.java');
+  if (await fs.pathExists(templateNotificationHelperPath)) {
+    notificationHelperContent = await fs.readFile(templateNotificationHelperPath, 'utf8');
+    console.log('🔔 Using template NotificationPermissionHelper.java');
+  } else if (await fs.pathExists(oldNotificationHelperPath)) {
+    notificationHelperContent = await fs.readFile(oldNotificationHelperPath, 'utf8');
+    console.log('⚠️ Using existing NotificationPermissionHelper.java from app directory');
+  }
+  
+  // Remove old notification helper file if it exists
+  if (await fs.pathExists(oldNotificationHelperPath)) {
+    await fs.remove(oldNotificationHelperPath);
+  }
+  
+  if (notificationHelperContent) {
+    notificationHelperContent = notificationHelperContent.replace(/package .*?;/, `package ${packageName};`);
+    notificationHelperContent = notificationHelperContent.replace(/\{\{PACKAGE_NAME\}\}/g, packageName);
+    await fs.writeFile(newNotificationHelperPath, notificationHelperContent);
+    console.log(`📱 NotificationPermissionHelper copied and updated for package: ${packageName}`);
   }
   
   // Copy Firebase configuration file for FCM support

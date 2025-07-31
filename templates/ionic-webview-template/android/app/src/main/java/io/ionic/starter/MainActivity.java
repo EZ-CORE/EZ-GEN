@@ -1,4 +1,4 @@
-package {{PACKAGE_NAME}};
+package io.ionic.starter;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -24,6 +24,9 @@ public class MainActivity extends BridgeActivity {
         
         // Create notification channel for Android 8.0+
         createNotificationChannel();
+        
+        // Request notification permission for Android 13+
+        requestNotificationPermissionIfNeeded();
         
         // Handle notification click
         handleNotificationIntent(getIntent());
@@ -157,7 +160,7 @@ public class MainActivity extends BridgeActivity {
         }
     }
     
-     private void setupWindowInsets() {
+    private void setupWindowInsets() {
         View decorView = getWindow().getDecorView();
 
         // Set up window insets listener to handle system UI overlays with newer AndroidX libraries
@@ -195,5 +198,34 @@ public class MainActivity extends BridgeActivity {
                 View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
             );
         }
+    }
+    
+    /**
+     * Request notification permission for Android 13+ if not already granted
+     */
+    private void requestNotificationPermissionIfNeeded() {
+        Log.d("MainActivity", "Checking notification permission status...");
+        
+        // Use a delay to ensure the activity is fully loaded
+        new android.os.Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!NotificationPermissionHelper.hasNotificationPermission(MainActivity.this)) {
+                    Log.d("MainActivity", "Notification permission not granted, requesting...");
+                    NotificationPermissionHelper.requestNotificationPermission(MainActivity.this);
+                } else {
+                    Log.d("MainActivity", "Notification permission already granted");
+                }
+            }
+        }, 2000); // 2 second delay to ensure activity is ready
+    }
+    
+    /**
+     * Handle permission request results
+     */
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        NotificationPermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 }

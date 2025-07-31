@@ -6,7 +6,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
-import { globe, refresh, home, eye } from 'ionicons/icons';
+import { globe, refresh, home, eye, notifications } from 'ionicons/icons';
 import { PushNotificationService } from './services/push-notification.service';
 
 @Component({
@@ -31,7 +31,7 @@ export class AppComponent implements OnInit {
     this.isNative = Capacitor.isNativePlatform();
     
     // Add icons
-    addIcons({ globe, refresh, home, eye });
+    addIcons({ globe, refresh, home, eye, notifications });
     
     // Register service worker for caching
     this.registerServiceWorker();
@@ -230,5 +230,15 @@ export class AppComponent implements OnInit {
         this.clickCount = 0;
       }
     }, 3000);
+  }
+
+  async requestNotificationPermissions() {
+    console.log('🔔 Manual notification permission request from UI...');
+    try {
+      await this.pushNotificationService.requestNotificationPermissions();
+      console.log('✅ Manual permission request completed');
+    } catch (error) {
+      console.error('❌ Manual permission request failed:', error);
+    }
   }
 }

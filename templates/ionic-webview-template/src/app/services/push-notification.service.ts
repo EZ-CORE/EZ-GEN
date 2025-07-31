@@ -14,9 +14,11 @@ export class PushNotificationService {
   async initializePushNotifications() {
     try {
       console.log('🔧 Starting push notification initialization...');
+      console.log('📱 Android Target SDK: 35 (Android 14) - POST_NOTIFICATIONS required');
       
-      // Add a longer delay to ensure Capacitor is fully initialized
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Extended delay to ensure full Capacitor initialization
+      console.log('⏳ Waiting for Capacitor to fully initialize...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
       // Check if we're on a supported platform
       if (typeof window === 'undefined') {
@@ -24,54 +26,83 @@ export class PushNotificationService {
         return;
       }
       
+      // Verify Capacitor is available
+      if (typeof (window as any).Capacitor === 'undefined') {
+        console.log('⚠️ Capacitor not available, skipping push notifications');
+        return;
+      }
+      
       // Always setup listeners first - don't depend on permissions
       this.setupListeners();
       
-      // Request permission to use push notifications with additional error handling
-      console.log('📋 Requesting push notification permissions...');
-      let permission;
+      // Wait for device ready state
+      console.log('📱 Checking device ready state...');
+      await this.waitForDeviceReady();
       
+      // Advanced permission request with multiple strategies
+      console.log('🎯 Starting advanced permission request sequence...');
+      
+      // Strategy 1: Check current permission status first
       try {
-        permission = await PushNotifications.requestPermissions();
-        console.log('🔐 Permission result:', permission);
+        console.log('📋 Strategy 1: Checking current permission status...');
         
-        if (permission && permission.receive === 'granted') {
-          console.log('✅ Permission granted, registering for push notifications...');
-          
-          try {
-            // Register with Apple / Google to receive push via APNS/FCM
-            await PushNotifications.register();
-            console.log('✅ Push notifications registered successfully');
-            console.log('⏳ Waiting for FCM token...');
-          } catch (registerError) {
-            console.error('❌ Error during registration:', registerError);
-          }
-        } else {
-          console.log('❌ Push notification permission denied or unavailable:', permission);
-          console.log('🔄 Attempting direct registration to trigger permission dialog...');
-          
-          // Try direct registration - this often triggers the permission dialog
-          try {
-            await PushNotifications.register();
-            console.log('✅ Push notifications registered via direct method');
-            console.log('⏳ Waiting for FCM token...');
-          } catch (directError) {
-            console.error('❌ Direct registration failed:', directError);
-          }
+        // Try to check permissions first (but don't rely on it)
+        let currentStatus;
+        try {
+          currentStatus = await PushNotifications.checkPermissions();
+          console.log('� Current permission status:', JSON.stringify(currentStatus));
+        } catch (checkError) {
+          console.log('⚠️ Cannot check current permissions (this is common):', checkError);
+          currentStatus = null;
         }
-      } catch (permissionError) {
-        console.error('❌ Error requesting permissions with Capacitor:', permissionError);
-        console.log('🔄 Trying alternative permission request...');
         
-        // Try to register anyway - this might trigger the native permission dialog
+        // If permissions are already granted, just register
+        if (currentStatus?.receive === 'granted') {
+          console.log('✅ Permissions already granted, registering...');
+          await PushNotifications.register();
+          console.log('✅ Registration successful with existing permissions');
+          return;
+        }
+        
+        // Strategy 2: Direct registration first (often triggers permission dialog)
+        console.log('🎯 Strategy 2: Direct registration attempt...');
         try {
           await PushNotifications.register();
-          console.log('✅ Push notifications registered via fallback method');
-          console.log('⏳ Waiting for FCM token...');
-        } catch (fallbackError) {
-          console.error('❌ Fallback registration also failed:', fallbackError);
-          console.log('⚠️ Continuing without permissions - listeners still active');
+          console.log('✅ Direct registration successful');
+          return;
+        } catch (directError) {
+          console.log('❌ Direct registration failed:', directError);
+          console.log('🔄 Continuing to explicit permission request...');
         }
+        
+        // Strategy 3: Explicit permission request
+        console.log('📋 Strategy 3: Explicit permission request...');
+        const permission = await PushNotifications.requestPermissions();
+        console.log('� Explicit permission result:', JSON.stringify(permission));
+        
+        if (permission?.receive === 'granted') {
+          console.log('✅ Permission explicitly granted!');
+          try {
+            await PushNotifications.register();
+            console.log('✅ Registration successful after explicit permission');
+          } catch (regError) {
+            console.error('❌ Registration failed after permission grant:', regError);
+            this.tryDelayedRegistration();
+          }
+        } else if (permission?.receive === 'denied') {
+          console.log('❌ Permission explicitly denied by user');
+          console.log('� User can enable notifications in: Settings > Apps > [App Name] > Notifications');
+          this.tryDelayedRegistration(); // Still try, sometimes works
+        } else {
+          console.log('⚠️ Permission status unclear or prompt not shown:', permission);
+          console.log('🔄 Attempting delayed registration as fallback...');
+          this.tryDelayedRegistration();
+        }
+        
+      } catch (permissionError) {
+        console.error('❌ Permission sequence failed:', permissionError);
+        console.log('🔄 Trying fallback registration methods...');
+        this.tryDelayedRegistration();
       }
       
     } catch (error) {
@@ -85,6 +116,64 @@ export class PushNotificationService {
         console.error('❌ Error setting up listeners:', setupError);
       }
     }
+  }
+
+  private async waitForDeviceReady(): Promise<void> {
+    return new Promise((resolve) => {
+      // Check if device is already ready
+      if (document.readyState === 'complete') {
+        console.log('📱 Device already ready');
+        resolve();
+        return;
+      }
+      
+      // Wait for document ready
+      const checkReady = () => {
+        if (document.readyState === 'complete') {
+          console.log('📱 Device now ready');
+          resolve();
+        } else {
+          setTimeout(checkReady, 100);
+        }
+      };
+      
+      checkReady();
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        console.log('⏰ Device ready timeout, proceeding anyway');
+        resolve();
+      }, 10000);
+    });
+  }
+
+  private tryDelayedRegistration(): void {
+    console.log('🔄 Starting delayed registration attempts...');
+    
+    // Multiple delayed attempts with increasing intervals
+    const delays = [1000, 3000, 5000, 10000];
+    
+    delays.forEach((delay, index) => {
+      setTimeout(async () => {
+        try {
+          console.log(`🎲 Delayed registration attempt ${index + 1} (${delay}ms)...`);
+          await PushNotifications.register();
+          console.log(`✅ Delayed registration attempt ${index + 1} succeeded!`);
+          console.log('⏳ Waiting for FCM token...');
+        } catch (fallbackError) {
+          console.log(`❌ Delayed registration attempt ${index + 1} failed:`, fallbackError);
+          
+          if (index === delays.length - 1) {
+            console.log('🏁 All registration attempts completed');
+            console.log('💡 If no FCM token appears, check:');
+            console.log('   1. Device Settings > Apps > [App Name] > Notifications');
+            console.log('   2. Android notification permission in system settings');
+            console.log('   3. Google Play Services availability');
+            console.log('   4. Firebase configuration files');
+          }
+        }
+      }, delay);
+    });
   }
 
   setupListeners() {
@@ -144,6 +233,46 @@ export class PushNotificationService {
       console.log('📱 FCM Token:', this.fcmToken);
     } else {
       console.log('❌ FCM Token not yet available. Please wait for initialization to complete.');
+    }
+  }
+
+  // Manual permission request method - can be called from UI
+  async requestNotificationPermissions(): Promise<void> {
+    console.log('🔔 Manual notification permission request triggered...');
+    
+    try {
+      // Show user what's happening
+      console.log('📱 Requesting notification permissions manually...');
+      console.log('🤖 Android 13+: This should show the system permission dialog');
+      
+      // Try the most direct approach first
+      const permission = await PushNotifications.requestPermissions();
+      console.log('🔐 Manual permission result:', JSON.stringify(permission));
+      
+      if (permission?.receive === 'granted') {
+        console.log('✅ Permission granted! Registering for notifications...');
+        await PushNotifications.register();
+        console.log('✅ Registration complete - waiting for FCM token...');
+      } else {
+        console.log('❌ Permission not granted:', permission);
+        console.log('🔄 Attempting registration anyway (might still work)...');
+        try {
+          await PushNotifications.register();
+          console.log('✅ Registration succeeded despite permission status');
+        } catch (regError) {
+          console.error('❌ Registration failed:', regError);
+          console.log('💡 Please enable notifications in device Settings > Apps > [App Name]');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Manual permission request failed:', error);
+      console.log('💡 Trying direct registration as fallback...');
+      try {
+        await PushNotifications.register();
+        console.log('✅ Direct registration fallback succeeded');
+      } catch (fallbackError) {
+        console.error('❌ All methods failed:', fallbackError);
+      }
     }
   }
 
