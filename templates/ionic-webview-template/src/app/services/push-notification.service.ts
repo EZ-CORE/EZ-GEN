@@ -12,13 +12,18 @@ export class PushNotificationService {
   constructor(private router: Router) {}
 
   async initializePushNotifications() {
+    console.log('🟢 FCM SERVICE CALLED - Starting FCM token generation...');
     try {
       console.log('🔧 Starting push notification initialization...');
       console.log('📱 Android Target SDK: 35 (Android 14) - POST_NOTIFICATIONS required');
       
-      // Extended delay to ensure full Capacitor initialization
-      console.log('⏳ Waiting for Capacitor to fully initialize...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // ALWAYS setup listeners first - this must happen every app launch
+      console.log('🎧 Setting up listeners first (required every app start)...');
+      this.setupListeners();
+      
+      // Brief delay to ensure Capacitor initialization
+      console.log('⏳ Waiting for Capacitor to initialize...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Check if we're on a supported platform
       if (typeof window === 'undefined') {
@@ -31,9 +36,6 @@ export class PushNotificationService {
         console.log('⚠️ Capacitor not available, skipping push notifications');
         return;
       }
-      
-      // Always setup listeners first - don't depend on permissions
-      this.setupListeners();
       
       // Wait for device ready state
       console.log('📱 Checking device ready state...');
@@ -56,11 +58,11 @@ export class PushNotificationService {
           currentStatus = null;
         }
         
-        // If permissions are already granted, just register
+        // If permissions are already granted, still register to get fresh token
         if (currentStatus?.receive === 'granted') {
-          console.log('✅ Permissions already granted, registering...');
+          console.log('✅ Permissions already granted, registering to get current token...');
           await PushNotifications.register();
-          console.log('✅ Registration successful with existing permissions');
+          console.log('✅ Registration completed - token should be received via listener');
           return;
         }
         
