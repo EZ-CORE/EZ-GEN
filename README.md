@@ -42,12 +42,34 @@ A white-label app generator that creates native Android/iOS apps from any websit
 4. **Open in browser:**
    Navigate to `http://localhost:3000`
 
+## 🐧 Linux Server Deployment
+
+For Linux server deployment, see [LINUX-DEPLOYMENT.md](LINUX-DEPLOYMENT.md) for complete setup instructions including:
+- Java/Android SDK installation
+- Shell script equivalents for Windows batch files
+- Environment configuration
+- Service setup and monitoring
+
+**Quick Linux Setup:**
+```bash
+# Make shell scripts executable
+chmod +x setup-app.sh check-apk-signature.sh
+
+# Install Java and Android SDK (Ubuntu/Debian)
+sudo apt update
+sudo apt install openjdk-17-jdk
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Follow complete guide in LINUX-DEPLOYMENT.md
+```
+
 ## Features
 
 - ✅ Generate native mobile apps from any website
 - ✅ Upload custom logos and splash screens
 - ✅ Download ready-to-build Ionic projects
 - ✅ Support for both Android and iOS
+- ✅ Cross-platform deployment (Windows/Linux)
 - ✅ Beautiful web interface
 - ✅ **Firebase Cloud Messaging (FCM) notifications**
 - ✅ **Automatic Android 13+ permission handling**
