@@ -195,6 +195,90 @@
             font-size: 2em;
             margin-bottom: 10px;
         }
+        
+        .console-container {
+            margin-top: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #1a1a1a;
+            height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #ffffff;
+            display: none;
+        }
+        
+        .console-container.active {
+            display: block;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .log-entry.info {
+            color: #60a5fa;
+        }
+        
+        .log-entry.success {
+            color: #34d399;
+        }
+        
+        .log-entry.warning {
+            color: #fbbf24;
+        }
+        
+        .log-entry.error {
+            color: #f87171;
+        }
+        
+        .log-timestamp {
+            color: #9ca3af;
+            font-size: 10px;
+        }
+        
+        .validation-error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            white-space: pre-line;
+        }
+        
+        .validation-warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #92400e;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+        
+        .input-error {
+            border-color: #ef4444 !important;
+        }
+        
+        .toggle-console {
+            background: #374151;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        .toggle-console:hover {
+            background: #4b5563;
+        }
     </style>
 </head>
 <body>
@@ -232,18 +316,23 @@
                 <div class="form-group">
                     <label for="appName">App Name *</label>
                     <input type="text" id="appName" name="appName" required placeholder="My Awesome App">
+                    <div id="appNameError" class="validation-error" style="display: none;"></div>
                 </div>
                 
                 <div class="form-group">
                     <label for="websiteUrl">Website URL *</label>
                     <input type="url" id="websiteUrl" name="websiteUrl" required placeholder="https://your-website.com">
+                    <div id="websiteUrlError" class="validation-error" style="display: none;"></div>
+                    <div id="websiteUrlWarning" class="validation-warning" style="display: none;"></div>
                 </div>
                 
                 <div class="form-group">
                     <label for="packageName">Package Name *</label>
-                    <input type="text" id="packageName" name="packageName" required placeholder="com.yourcompany.appname" pattern="^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$">
+                    <input type="text" id="packageName" name="packageName" required placeholder="com.yourcompany.appname">
+                    <div id="packageNameError" class="validation-error" style="display: none;"></div>
+                    <div id="packageNameWarning" class="validation-warning" style="display: none;"></div>
                     <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
-                        Must follow Java package format: lowercase letters and dots only (e.g., com.company.app)
+                        Must follow Java package naming (e.g., com.company.appname)
                     </div>
                 </div>
                 
@@ -271,29 +360,228 @@
             <div class="loading" id="loading">
                 <div class="spinner"></div>
                 <p>Generating your mobile app...</p>
+                <button class="toggle-console" onclick="toggleConsole()">
+                    📟 Show Console
+                </button>
+                <div class="console-container" id="console">
+                    <div id="consoleContent"></div>
+                </div>
             </div>
             
             <div class="result" id="result"></div>
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
+        let socket = null;
+        let sessionId = null;
+        
+        // Generate unique session ID for this user
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // Initialize session when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            sessionId = generateSessionId();
+            console.log('Session ID:', sessionId);
+        });
+        
+        // Initialize Socket.IO connection
+        function initializeSocket() {
+            if (socket) return;
+            
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                socket.emit('join-session', sessionId);
+            });
+            
+            socket.on('log', (logEntry) => {
+                addLogEntry(logEntry);
+            });
+            
+            socket.on('session-logs', (logs) => {
+                // Load existing logs for this session
+                logs.forEach(log => addLogEntry(log));
+            });
+        }
+        
+        // Add log entry to console
+        function addLogEntry(logEntry) {
+            const consoleContent = document.getElementById('consoleContent');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log-entry ${logEntry.type}`;
+            
+            const timestamp = new Date(logEntry.timestamp).toLocaleTimeString();
+            logDiv.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${logEntry.message}`;
+            
+            consoleContent.appendChild(logDiv);
+            
+            // Auto-scroll to bottom
+            const console = document.getElementById('console');
+            console.scrollTop = console.scrollHeight;
+        }
+        
+        // Toggle console visibility
+        function toggleConsole() {
+            const console = document.getElementById('console');
+            const button = document.querySelector('.toggle-console');
+            
+            if (console.classList.contains('active')) {
+                console.classList.remove('active');
+                button.textContent = '📟 Show Console';
+            } else {
+                console.classList.add('active');
+                button.textContent = '📟 Hide Console';
+            }
+        }
+        
+        // Input validation functions
+        function validateAppName(appName) {
+            const errorDiv = document.getElementById('appNameError');
+            const input = document.getElementById('appName');
+            
+            if (!appName || appName.length < 2 || appName.length > 50) {
+                showError(input, errorDiv, 'App name must be between 2 and 50 characters');
+                return false;
+            }
+            
+            if (!/^[a-zA-Z0-9\s\-_]+$/.test(appName)) {
+                showError(input, errorDiv, 'App name can only contain letters, numbers, spaces, hyphens, and underscores');
+                return false;
+            }
+            
+            hideError(input, errorDiv);
+            return true;
+        }
+        
+        function validateWebsiteUrl(url) {
+            const errorDiv = document.getElementById('websiteUrlError');
+            const warningDiv = document.getElementById('websiteUrlWarning');
+            const input = document.getElementById('websiteUrl');
+            
+            try {
+                const urlObj = new URL(url);
+                
+                if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                    showError(input, errorDiv, 'Website URL must use HTTP or HTTPS protocol');
+                    return false;
+                }
+                
+                if (!urlObj.hostname || urlObj.hostname.length < 3) {
+                    showError(input, errorDiv, 'Website URL must have a valid hostname');
+                    return false;
+                }
+                
+                // Check for localhost warning
+                if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
+                    hideError(input, errorDiv);
+                    showWarning(warningDiv, 'Warning: Using localhost URL - this will only work for local testing');
+                } else {
+                    hideError(input, errorDiv);
+                    hideWarning(warningDiv);
+                }
+                
+                return true;
+            } catch (error) {
+                showError(input, errorDiv, 'Invalid URL format. Please enter a valid website URL (e.g., https://example.com)');
+                return false;
+            }
+        }
+        
+        function validatePackageName(packageName) {
+            const errorDiv = document.getElementById('packageNameError');
+            const warningDiv = document.getElementById('packageNameWarning');
+            const input = document.getElementById('packageName');
+            
+            const packageRegex = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+            
+            if (!packageRegex.test(packageName)) {
+                showError(input, errorDiv, 
+                    'Package name must follow Java package naming conventions:\n' +
+                    '• Must start with a lowercase letter\n' +
+                    '• Can contain lowercase letters, numbers, and underscores\n' +
+                    '• Must have at least one dot (e.g., com.company.appname)\n' +
+                    '• Each part must start with a letter\n' +
+                    'Example: com.yourcompany.appname'
+                );
+                return false;
+            }
+            
+            const parts = packageName.split('.');
+            if (parts.length < 3) {
+                hideError(input, errorDiv);
+                showWarning(warningDiv, 'Consider using 3 parts for better uniqueness (e.g., com.company.appname)');
+            } else {
+                hideError(input, errorDiv);
+                hideWarning(warningDiv);
+            }
+            
+            return true;
+        }
+        
+        function showError(input, errorDiv, message) {
+            input.classList.add('input-error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function hideError(input, errorDiv) {
+            input.classList.remove('input-error');
+            errorDiv.style.display = 'none';
+        }
+        
+        function showWarning(warningDiv, message) {
+            warningDiv.textContent = message;
+            warningDiv.style.display = 'block';
+        }
+        
+        function hideWarning(warningDiv) {
+            warningDiv.style.display = 'none';
+        }
+        
+        // Real-time validation
+        document.getElementById('appName').addEventListener('input', (e) => {
+            validateAppName(e.target.value);
+        });
+        
+        document.getElementById('websiteUrl').addEventListener('input', (e) => {
+            validateWebsiteUrl(e.target.value);
+        });
+        
+        document.getElementById('packageName').addEventListener('input', (e) => {
+            validatePackageName(e.target.value);
+        });
+        
+        // Form submission
         document.getElementById('appForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            // Validate package name format
+            const appName = document.getElementById('appName').value;
+            const websiteUrl = document.getElementById('websiteUrl').value;
             const packageName = document.getElementById('packageName').value;
-            const packagePattern = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/;
             
-            if (!packagePattern.test(packageName)) {
-                alert('Invalid package name format. Please use lowercase letters and dots only (e.g., com.company.app)');
+            // Validate all inputs
+            const isAppNameValid = validateAppName(appName);
+            const isUrlValid = validateWebsiteUrl(websiteUrl);
+            const isPackageValid = validatePackageName(packageName);
+            
+            if (!isAppNameValid || !isUrlValid || !isPackageValid) {
+                alert('Please fix the validation errors before submitting');
                 return;
             }
             
+            // Initialize socket connection
+            initializeSocket();
+            
             const formData = new FormData();
-            formData.append('appName', document.getElementById('appName').value);
-            formData.append('websiteUrl', document.getElementById('websiteUrl').value);
+            formData.append('appName', appName);
+            formData.append('websiteUrl', websiteUrl);
             formData.append('packageName', packageName);
+            formData.append('sessionId', sessionId);
             
             const logo = document.getElementById('logo').files[0];
             const splash = document.getElementById('splash').files[0];
@@ -301,10 +589,16 @@
             if (logo) formData.append('logo', logo);
             if (splash) formData.append('splash', splash);
             
-            // Show loading
+            // Show loading and console
             document.getElementById('generateBtn').disabled = true;
             document.getElementById('loading').style.display = 'block';
             document.getElementById('result').style.display = 'none';
+            
+            // Auto-show console during generation
+            const console = document.getElementById('console');
+            const toggleButton = document.querySelector('.toggle-console');
+            console.classList.add('active');
+            toggleButton.textContent = '📟 Hide Console';
             
             try {
                 const response = await fetch('/api/generate-app', {
@@ -339,7 +633,10 @@
                             <div style="background: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b;">
                                 <h4 style="margin: 0 0 10px 0; color: #d97706;">🔧 For Testing & Development</h4>
                                 <a href="${result.apkDownloadUrl}" class="download-btn" download style="background: #3b82f6; margin-right: 10px;">
-                                    📱 Download APK (Testing)
+                                    🔧 Download Debug APK
+                                </a>
+                                <a href="${result.releaseApkDownloadUrl}" class="download-btn" download style="background: #dc2626; margin-right: 10px;">
+                                    🚀 Download Release APK
                                 </a>
                                 <a href="${result.downloadUrl}" class="download-btn" download style="background: #6b7280;">
                                     📁 Download Project
@@ -352,8 +649,9 @@
                             </p>
                         </div>
                         <div style="margin-top: 10px; font-size: 0.85em; color: #6b7280;">
-                            <p style="margin: 5px 0;"><strong>� AAB:</strong> Upload this to Google Play Console (recommended format)</p>
-                            <p style="margin: 5px 0;"><strong>📱 APK:</strong> Install on your Android device for testing</p>
+                            <p style="margin: 5px 0;"><strong>📦 AAB:</strong> Upload this to Google Play Console (recommended format)</p>
+                            <p style="margin: 5px 0;"><strong>🔧 Debug APK:</strong> Install on your device for testing (unsigned, development only)</p>
+                            <p style="margin: 5px 0;"><strong>🚀 Release APK:</strong> Signed, production-ready APK for sideloading</p>
                             <p style="margin: 5px 0;"><strong>📋 Guide:</strong> Step-by-step Play Store submission instructions</p>
                         </div>
                     `;

@@ -7,9 +7,75 @@ const { v4: uuidv4 } = require('uuid');
 const archiver = require('archiver');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
+const http = require('http');
+const socketIo = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
 const PORT = process.env.PORT || 3000;
+
+// Store active sessions and their logs
+const activeSessions = new Map();
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  
+  socket.on('join-session', (sessionId) => {
+    socket.join(sessionId);
+    console.log(`Client ${socket.id} joined session ${sessionId}`);
+    
+    // Send existing logs for this session
+    if (activeSessions.has(sessionId)) {
+      const session = activeSessions.get(sessionId);
+      socket.emit('session-logs', session.logs);
+    }
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// Helper function to log messages to a specific session
+function logToSession(sessionId, message, type = 'info') {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    message,
+    type, // 'info', 'success', 'warning', 'error'
+    id: uuidv4()
+  };
+  
+  // Store in session
+  if (!activeSessions.has(sessionId)) {
+    activeSessions.set(sessionId, {
+      logs: [],
+      startTime: timestamp
+    });
+  }
+  
+  const session = activeSessions.get(sessionId);
+  session.logs.push(logEntry);
+  
+  // Keep only last 1000 logs to prevent memory issues
+  if (session.logs.length > 1000) {
+    session.logs = session.logs.slice(-1000);
+  }
+  
+  // Emit to all clients in this session
+  io.to(sessionId).emit('log', logEntry);
+  
+  // Also log to console
+  console.log(`[${sessionId}] ${message}`);
+}
 
 // Middleware
 app.use(cors());
@@ -30,6 +96,100 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Input validation functions
+function validateAppName(appName) {
+  if (!appName || typeof appName !== 'string') {
+    return { isValid: false, message: 'App name is required and must be a string' };
+  }
+  
+  if (appName.length < 2 || appName.length > 50) {
+    return { isValid: false, message: 'App name must be between 2 and 50 characters' };
+  }
+  
+  // Allow letters, numbers, spaces, hyphens, and underscores
+  if (!/^[a-zA-Z0-9\s\-_]+$/.test(appName)) {
+    return { isValid: false, message: 'App name can only contain letters, numbers, spaces, hyphens, and underscores' };
+  }
+  
+  return { isValid: true };
+}
+
+function validateWebsiteUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return { isValid: false, message: 'Website URL is required' };
+  }
+  
+  try {
+    const urlObj = new URL(url);
+    
+    // Must be http or https
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      return { isValid: false, message: 'Website URL must use HTTP or HTTPS protocol' };
+    }
+    
+    // Must have a valid hostname
+    if (!urlObj.hostname || urlObj.hostname.length < 3) {
+      return { isValid: false, message: 'Website URL must have a valid hostname' };
+    }
+    
+    // Should not be localhost for production apps (warning, not error)
+    if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
+      return { 
+        isValid: true, 
+        warning: 'Warning: Using localhost URL - this will only work for local testing' 
+      };
+    }
+    
+    return { isValid: true };
+  } catch (error) {
+    return { isValid: false, message: 'Invalid URL format. Please enter a valid website URL (e.g., https://example.com)' };
+  }
+}
+
+function validatePackageName(packageName) {
+  if (!packageName || typeof packageName !== 'string') {
+    return { isValid: false, message: 'Package name is required' };
+  }
+  
+  // Java package naming convention
+  const packageRegex = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+  
+  if (!packageRegex.test(packageName)) {
+    return { 
+      isValid: false, 
+      message: 'Package name must follow Java package naming conventions:\n' +
+               '• Must start with a lowercase letter\n' +
+               '• Can contain lowercase letters, numbers, and underscores\n' +
+               '• Must have at least one dot (e.g., com.company.appname)\n' +
+               '• Each part must start with a letter\n' +
+               'Example: com.yourcompany.appname'
+    };
+  }
+  
+  // Check for reserved words and common mistakes
+  const parts = packageName.split('.');
+  const reservedWords = ['android', 'java', 'javax', 'com.android', 'com.google'];
+  
+  if (parts.length < 2) {
+    return { isValid: false, message: 'Package name must have at least 2 parts separated by dots (e.g., com.company)' };
+  }
+  
+  if (parts.length < 3) {
+    return { 
+      isValid: true, 
+      warning: 'Consider using 3 parts for better uniqueness (e.g., com.company.appname)' 
+    };
+  }
+  
+  for (const part of parts) {
+    if (reservedWords.includes(part) || packageName.startsWith(part + '.')) {
+      return { isValid: false, message: `Package name cannot use reserved word: ${part}` };
+    }
+  }
+  
+  return { isValid: true };
+}
+
 // Routes
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'EZ-GEN App Generator is running!' });
@@ -40,27 +200,72 @@ app.post('/api/generate-app', upload.fields([
   { name: 'logo', maxCount: 1 },
   { name: 'splash', maxCount: 1 }
 ]), async (req, res) => {
+  const sessionId = req.body.sessionId || uuidv4();
+  
   try {
     const { appName, websiteUrl, packageName } = req.body;
     
-    // Validate package name format
-    if (!packageName || !/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/.test(packageName)) {
+    logToSession(sessionId, '🚀 Starting app generation process...', 'info');
+    logToSession(sessionId, `📝 App Name: ${appName}`, 'info');
+    logToSession(sessionId, `🌐 Website URL: ${websiteUrl}`, 'info');
+    logToSession(sessionId, `📦 Package Name: ${packageName}`, 'info');
+    
+    // Validate inputs
+    logToSession(sessionId, '✅ Validating inputs...', 'info');
+    
+    const appNameValidation = validateAppName(appName);
+    if (!appNameValidation.isValid) {
+      logToSession(sessionId, `❌ App name validation failed: ${appNameValidation.message}`, 'error');
       return res.status(400).json({
         success: false,
-        message: 'Invalid package name. Package name must follow Java package naming conventions (e.g., com.company.appname). Only lowercase letters, numbers, and dots are allowed.',
-        error: 'Invalid package name format'
+        message: appNameValidation.message,
+        error: 'Invalid app name',
+        sessionId
       });
     }
     
-    const appId = uuidv4();
+    const urlValidation = validateWebsiteUrl(websiteUrl);
+    if (!urlValidation.isValid) {
+      logToSession(sessionId, `❌ Website URL validation failed: ${urlValidation.message}`, 'error');
+      return res.status(400).json({
+        success: false,
+        message: urlValidation.message,
+        error: 'Invalid website URL',
+        sessionId
+      });
+    }
     
-    console.log('Generating app:', { appName, websiteUrl, packageName, appId });
+    if (urlValidation.warning) {
+      logToSession(sessionId, `⚠️ ${urlValidation.warning}`, 'warning');
+    }
+    
+    const packageValidation = validatePackageName(packageName);
+    if (!packageValidation.isValid) {
+      logToSession(sessionId, `❌ Package name validation failed: ${packageValidation.message}`, 'error');
+      return res.status(400).json({
+        success: false,
+        message: packageValidation.message,
+        error: 'Invalid package name',
+        sessionId
+      });
+    }
+    
+    if (packageValidation.warning) {
+      logToSession(sessionId, `⚠️ ${packageValidation.warning}`, 'warning');
+    }
+    
+    logToSession(sessionId, '✅ All inputs validated successfully!', 'success');
+    
+    const appId = uuidv4();
+    logToSession(sessionId, `🆔 Generated app ID: ${appId}`, 'info');
     
     // Create app directory
+    logToSession(sessionId, '📁 Creating app directory...', 'info');
     const appDir = path.join(__dirname, 'generated-apps', appId);
     await fs.ensureDir(appDir);
     
     // Copy template
+    logToSession(sessionId, '📋 Copying template files...', 'info');
     const templateDir = path.join(__dirname, 'templates', 'ionic-webview-template');
     await fs.copy(templateDir, appDir);
 
@@ -68,31 +273,39 @@ app.post('/api/generate-app', upload.fields([
     const readmePath = path.join(templateDir, 'GENERATED_APP_README.md');
     if (await fs.pathExists(readmePath)) {
       await fs.copy(readmePath, path.join(appDir, 'README.md'));
+      logToSession(sessionId, '📖 README file copied', 'info');
     }
     
     // Update app configuration
+    logToSession(sessionId, '⚙️ Updating app configuration...', 'info');
     await updateAppConfig(appDir, {
       appName,
       websiteUrl,
       packageName,
       logo: req.files?.logo?.[0],
       splash: req.files?.splash?.[0]
-    });
+    }, sessionId);
 
     // Build and sync the app to ensure it's ready for use
+    logToSession(sessionId, '🔨 Building and syncing app...', 'info');
     try {
-      await buildAndSyncApp(appDir, appName, packageName);
-      console.log('App built and synced successfully!');
+      await buildAndSyncApp(appDir, appName, packageName, sessionId);
+      logToSession(sessionId, '✅ App built and synced successfully!', 'success');
     } catch (buildError) {
-      console.warn('Build/sync failed, but app was generated. User will need to run build manually:', buildError.message);
+      logToSession(sessionId, `⚠️ Build/sync failed, but app was generated: ${buildError.message}`, 'warning');
+      logToSession(sessionId, '💡 You may need to run build manually later', 'info');
     }
+
+    logToSession(sessionId, '🎉 App generation completed successfully!', 'success');
 
     res.json({
       success: true,
       appId,
+      sessionId,
       message: 'Play Store-ready app generated successfully!',
       downloadUrl: `/api/download/${appId}`,
       apkDownloadUrl: `/api/download-apk/${appId}`,
+      releaseApkDownloadUrl: `/api/download-release-apk/${appId}`,
       aabDownloadUrl: `/api/download-aab/${appId}`,
       guideUrl: `/api/download-guide/${appId}`,
       builds: {
@@ -168,7 +381,7 @@ app.get('/api/download-apk/:appId', async (req, res) => {
         return res.download(apkPath, apkFile);
       }
     }
-    
+
     // Fallback: look in the app directory
     const appDir = path.join(__dirname, 'generated-apps', appId);
     if (await fs.pathExists(appDir)) {
@@ -181,11 +394,48 @@ app.get('/api/download-apk/:appId', async (req, res) => {
       }
     }
     
-    return res.status(404).json({ error: 'APK not found' });
-    
+    res.status(404).json({ success: false, message: 'APK not found' });
   } catch (error) {
-    console.error('APK download error:', error);
-    res.status(500).json({ error: 'Failed to download APK' });
+    console.error('Error downloading APK:', error);
+    res.status(500).json({ success: false, message: 'Failed to download APK' });
+  }
+});
+
+// Download release APK endpoint
+app.get('/api/download-release-apk/:appId', async (req, res) => {
+  try {
+    const { appId } = req.params;
+    
+    // Look for release APK in the apks folder
+    const apksDir = path.join(__dirname, 'apks');
+    if (await fs.pathExists(apksDir)) {
+      const apkFiles = await fs.readdir(apksDir);
+      const releaseApk = apkFiles.find(file => file.includes('release') && file.endsWith('.apk') && !file.includes('debug'));
+      
+      if (releaseApk) {
+        const apkPath = path.join(apksDir, releaseApk);
+        return res.download(apkPath, releaseApk);
+      }
+    }
+
+    // Fallback: look in the app directory
+    const appDir = path.join(__dirname, 'generated-apps', appId);
+    const androidReleaseDir = path.join(appDir, 'android', 'app', 'build', 'outputs', 'apk', 'release');
+    
+    if (await fs.pathExists(androidReleaseDir)) {
+      const apkFiles = await fs.readdir(androidReleaseDir);
+      const releaseApk = apkFiles.find(file => file.endsWith('.apk'));
+      
+      if (releaseApk) {
+        const apkPath = path.join(androidReleaseDir, releaseApk);
+        return res.download(apkPath, releaseApk);
+      }
+    }
+    
+    res.status(404).json({ success: false, message: 'Release APK not found' });
+  } catch (error) {
+    console.error('Error downloading release APK:', error);
+    res.status(500).json({ success: false, message: 'Failed to download release APK' });
   }
 });
 
@@ -235,12 +485,15 @@ app.get('/api/download-guide/:appId', async (req, res) => {
 });
 
 // Update app configuration
-async function updateAppConfig(appDir, config) {
+async function updateAppConfig(appDir, config, sessionId = null) {
   const { appName, websiteUrl, packageName, logo, splash } = config;
+  
+  if (sessionId) logToSession(sessionId, '📝 Updating capacitor configuration...', 'info');
   
   // Update capacitor.config.ts
   const capacitorConfigPath = path.join(appDir, 'capacitor.config.ts');
   if (await fs.pathExists(capacitorConfigPath)) {
+    if (sessionId) logToSession(sessionId, '⚙️ Updating Capacitor configuration...', 'info');
     let capacitorConfig = await fs.readFile(capacitorConfigPath, 'utf8');
     capacitorConfig = capacitorConfig
       .replace(/appId: '.*?'/, `appId: '${packageName}'`)
@@ -248,6 +501,7 @@ async function updateAppConfig(appDir, config) {
     
     // If assets configuration is missing and we have logo/splash, add it
     if ((logo || splash) && !capacitorConfig.includes('CapacitorAssets')) {
+      if (sessionId) logToSession(sessionId, '🎨 Adding asset configuration...', 'info');
       capacitorConfig = capacitorConfig.replace(
         /webDir: '[^']*'/,
         `webDir: 'www',
@@ -261,9 +515,11 @@ async function updateAppConfig(appDir, config) {
     }
     
     await fs.writeFile(capacitorConfigPath, capacitorConfig);
+    if (sessionId) logToSession(sessionId, '✅ Capacitor configuration updated', 'success');
   }
   
   // Update package.json
+  if (sessionId) logToSession(sessionId, '📦 Updating package.json...', 'info');
   const packageJsonPath = path.join(appDir, 'package.json');
   if (await fs.pathExists(packageJsonPath)) {
     const packageJson = await fs.readJson(packageJsonPath);
@@ -421,15 +677,45 @@ async function updateAppConfig(appDir, config) {
     console.warn('⚠️ Firebase configuration template not found. FCM notifications may not work.');
   }
   
-  // Update app component to load website URL
+  // Update app component to load website URL and replace hardcoded values
   const appComponentPath = path.join(appDir, 'src', 'app', 'app.component.ts');
   if (await fs.pathExists(appComponentPath)) {
     let appComponent = await fs.readFile(appComponentPath, 'utf8');
-    appComponent = appComponent.replace(
-      /websiteUrl = '.*?'/,
-      `websiteUrl = '${websiteUrl}'`
-    );
+    appComponent = appComponent
+      .replace(/websiteUrl = '.*?'/, `websiteUrl = '${websiteUrl}'`)
+      .replace(/Timeless app/g, `${appName} app`)
+      .replace(/timeless-updates/g, `${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-updates`);
     await fs.writeFile(appComponentPath, appComponent);
+  }
+
+  // Update push notification service with app-specific values
+  const pushServicePath = path.join(appDir, 'src', 'app', 'services', 'push-notification.service.ts');
+  if (await fs.pathExists(pushServicePath)) {
+    let pushService = await fs.readFile(pushServicePath, 'utf8');
+    pushService = pushService
+      .replace(/timeless-user/g, `${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-user`)
+      .replace(/appName: 'Timeless'/g, `appName: '${appName}'`);
+    await fs.writeFile(pushServicePath, pushService);
+  }
+
+  // Update service worker files
+  const swPaths = [
+    path.join(appDir, 'src', 'sw.js'),
+    path.join(appDir, 'src', 'assets', 'sw.js')
+  ];
+  
+  for (const swPath of swPaths) {
+    if (await fs.pathExists(swPath)) {
+      let swContent = await fs.readFile(swPath, 'utf8');
+      const urlObj = new URL(websiteUrl);
+      const domain = urlObj.hostname;
+      
+      swContent = swContent
+        .replace(/timeless-cache/g, `${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-cache`)
+        .replace(/http:\/\/timeless\.ezassist\.me/g, websiteUrl)
+        .replace(/timeless\.ezassist\.me/g, domain);
+      await fs.writeFile(swPath, swContent);
+    }
   }
   
   // Update network security config for Android to allow the user's domain
@@ -1314,9 +1600,10 @@ async function cleanupOldUploads() {
   }
 }
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 EZ-GEN App Generator running on http://localhost:${PORT}`);
   console.log(`📱 Ready to generate mobile apps!`);
+  console.log(`🔌 WebSocket server ready for real-time logging`);
   
   // Clean up old uploads on startup
   cleanupOldUploads();
