@@ -872,6 +872,22 @@ async function generateReleaseBuilds(appDir, appName, keystoreInfo) {
     const androidDir = path.join(appDir, 'android');
     const gradlewCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     
+    // Make gradlew executable on Unix-like systems
+    if (process.platform !== 'win32') {
+      const gradlewPath = path.join(androidDir, 'gradlew');
+      try {
+        // Fix line endings for Unix/Linux compatibility
+        const gradlewContent = fs.readFileSync(gradlewPath, 'utf8');
+        const fixedContent = gradlewContent.replace(/\r\n/g, '\n');
+        fs.writeFileSync(gradlewPath, fixedContent);
+        
+        fs.chmodSync(gradlewPath, '755');
+        console.log('🔧 Made gradlew executable and fixed line endings');
+      } catch (error) {
+        console.log('⚠️  Could not make gradlew executable:', error.message);
+      }
+    }
+    
     // First, let's try building just the release APK to see if signing works
     console.log('📱 Building release APK first...');
     
@@ -1175,6 +1191,21 @@ async function generateApk(appDir, appName) {
     
     console.log('⚙️  Building APK with Gradle wrapper...');
     const gradlewCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+    
+    // Make gradlew executable on Unix-like systems
+    if (process.platform !== 'win32') {
+      try {
+        // Fix line endings for Unix/Linux compatibility
+        const gradlewContent = fs.readFileSync(gradlewPath, 'utf8');
+        const fixedContent = gradlewContent.replace(/\r\n/g, '\n');
+        fs.writeFileSync(gradlewPath, fixedContent);
+        
+        fs.chmodSync(gradlewPath, '755');
+        console.log('🔧 Made gradlew executable and fixed line endings');
+      } catch (error) {
+        console.log('⚠️  Could not make gradlew executable:', error.message);
+      }
+    }
     
     const gradleBuild = spawn(gradlewCmd, ['assembleDebug'], {
       cwd: androidDir,
