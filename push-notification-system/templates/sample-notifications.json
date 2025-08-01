@@ -1,0 +1,116 @@
+[
+  {
+    "name": "Welcome Notification",
+    "type": "single",
+    "payload": {
+      "title": "👋 Welcome to EZ-GEN!",
+      "body": "Thanks for installing our app. Get started by exploring the features!",
+      "imageUrl": "https://picsum.photos/400/200?random=1",
+      "data": {
+        "type": "welcome",
+        "deepLink": "/welcome",
+        "clickAction": "OPEN_APP"
+      }
+    }
+  },
+  {
+    "name": "App Update Available",
+    "type": "topic",
+    "topic": "updates",
+    "payload": {
+      "title": "🔄 App Update Available",
+      "body": "A new version of the app is available with exciting new features!",
+      "data": {
+        "type": "update",
+        "deepLink": "/update",
+        "version": "1.2.0"
+      }
+    }
+  },
+  {
+    "name": "Task Reminder",
+    "type": "single",
+    "payload": {
+      "title": "⏰ Don't Forget!",
+      "body": "You have pending tasks waiting for your attention.",
+      "data": {
+        "type": "reminder",
+        "deepLink": "/tasks",
+        "taskCount": 3
+      }
+    }
+  },
+  {
+    "name": "News Article",
+    "type": "topic",
+    "topic": "news",
+    "payload": {
+      "title": "📰 Breaking News",
+      "body": "Important update from your favorite news source.",
+      "imageUrl": "https://picsum.photos/400/300?random=2",
+      "data": {
+        "type": "news",
+        "deepLink": "/news/article/123",
+        "articleId": "123"
+      }
+    }
+  },
+  {
+    "name": "Social Notification",
+    "type": "single",
+    "payload": {
+      "title": "👥 New Friend Request",
+      "body": "John Doe wants to connect with you!",
+      "data": {
+        "type": "social",
+        "deepLink": "/profile/john-doe",
+        "userId": "john-doe",
+        "action": "friend-request"
+      }
+    }
+  },
+  {
+    "name": "Promotional",
+    "type": "bulk",
+    "payload": {
+      "title": "🎉 Special Offer!",
+      "body": "Get 50% off on all premium features this weekend only!",
+      "imageUrl": "https://picsum.photos/400/250?random=3",
+      "data": {
+        "type": "promotion",
+        "deepLink": "/offers",
+        "discount": "50",
+        "validUntil": "2025-08-01"
+      }
+    }
+  },
+  {
+    "name": "Achievement Unlocked",
+    "type": "single",
+    "payload": {
+      "title": "🏆 Achievement Unlocked!",
+      "body": "Congratulations! You've completed 10 tasks this week.",
+      "data": {
+        "type": "achievement",
+        "deepLink": "/achievements",
+        "achievementId": "task-master",
+        "points": 100
+      }
+    }
+  },
+  {
+    "name": "System Maintenance",
+    "type": "topic",
+    "topic": "system",
+    "payload": {
+      "title": "🔧 Scheduled Maintenance",
+      "body": "The app will be under maintenance from 2 AM to 4 AM EST.",
+      "data": {
+        "type": "maintenance",
+        "deepLink": "/status",
+        "startTime": "2025-07-28T02:00:00Z",
+        "endTime": "2025-07-28T04:00:00Z"
+      }
+    }
+  }
+]

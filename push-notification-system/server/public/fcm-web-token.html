@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Web Token Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .token-display {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f8ff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .copy-btn {
+            background: #007bff;
+            font-size: 12px;
+            padding: 5px 10px;
+        }
+        
+        .copy-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase FCM Web Token Generator</h1>
+        
+        <div class="instructions">
+            <h3>📝 Instructions:</h3>
+            <ol>
+                <li><strong>Grant Permission:</strong> Click "Request Notification Permission" first</li>
+                <li><strong>Generate Token:</strong> Click "Get FCM Token" to generate your web FCM token</li>
+                <li><strong>Copy Token:</strong> Use the generated token to test push notifications</li>
+                <li><strong>Open Console:</strong> Press F12 and check the Console tab for detailed logs</li>
+            </ol>
+        </div>
+        
+        <div>
+            <button onclick="requestPermission()" id="permissionBtn">🔔 Request Notification Permission</button>
+            <button onclick="generateToken()" id="tokenBtn" disabled>📱 Get FCM Token</button>
+            <button onclick="testToken()" id="testBtn" disabled>🧪 Test Token</button>
+        </div>
+        
+        <div id="status"></div>
+        
+        <div id="tokenSection" style="display: none;">
+            <h3>🎯 Generated FCM Token:</h3>
+            <div id="web-fcm-token" class="token-display">Token will appear here...</div>
+            <button onclick="copyToken()" class="copy-btn">📋 Copy Token</button>
+        </div>
+        
+        <div class="instructions" style="margin-top: 30px;">
+            <h3>🔧 Console Commands:</h3>
+            <p>You can also use these commands directly in the browser console (F12):</p>
+            <ul>
+                <li><code>requestNotificationPermission()</code> - Request notification permission</li>
+                <li><code>getFCMToken()</code> - Generate and display FCM token</li>
+                <li><code>messaging</code> - Access the Firebase messaging instance</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAx-_0N4gAvQa7QtnJN5jCdyazs_kNHM-Y",
+            authDomain: "ez-gen-notification.firebaseapp.com",
+            projectId: "ez-gen-notification",
+            storageBucket: "ez-gen-notification.firebasestorage.app",
+            messagingSenderId: "23037188092",
+            appId: "1:23037188092:web:ec2304839da86916adc479" // Using the mobile app ID for now
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const messaging = getMessaging(app);
+
+        // Status display function
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        // Request notification permission
+        window.requestPermission = async function() {
+            console.log('🔔 Requesting notification permission...');
+            showStatus('🔄 Requesting notification permission...', 'info');
+            
+            try {
+                const permission = await Notification.requestPermission();
+                console.log('🔔 Permission result:', permission);
+                
+                if (permission === 'granted') {
+                    showStatus('✅ Notification permission granted! You can now generate FCM token.', 'success');
+                    document.getElementById('tokenBtn').disabled = false;
+                    return true;
+                } else {
+                    showStatus('❌ Notification permission denied. Please allow notifications to continue.', 'error');
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Error requesting permission:', error);
+                showStatus(`❌ Error requesting permission: ${error.message}`, 'error');
+                return false;
+            }
+        };
+
+        // Generate FCM token
+        window.generateToken = async function() {
+            console.log('📱 Generating FCM token...');
+            showStatus('🔄 Generating FCM token...', 'info');
+            
+            try {
+                // Register service worker first
+                if ('serviceWorker' in navigator) {
+                    try {
+                        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                        console.log('✅ Service Worker registered successfully:', registration);
+                    } catch (swError) {
+                        console.error('❌ Service Worker registration failed:', swError);
+                        showStatus(`⚠️ Service Worker registration failed: ${swError.message}`, 'error');
+                    }
+                }
+
+                // Generate token with service worker support
+                const currentToken = await getToken(messaging, {
+                    serviceWorkerRegistration: await navigator.serviceWorker.ready
+                });
+
+                if (currentToken) {
+                    console.log('✅ FCM Token generated successfully!');
+                    console.log('📱 FCM Token:', currentToken);
+                    
+                    // Display token
+                    document.getElementById('web-fcm-token').textContent = currentToken;
+                    document.getElementById('tokenSection').style.display = 'block';
+                    document.getElementById('testBtn').disabled = false;
+                    
+                    showStatus('✅ FCM Token generated successfully! Check the token below and console.', 'success');
+                    
+                    // Store token globally for testing
+                    window.currentFCMToken = currentToken;
+                    
+                    return currentToken;
+                } else {
+                    console.log('❌ No registration token available.');
+                    showStatus('❌ No registration token available. Make sure notifications are enabled.', 'error');
+                    return null;
+                }
+            } catch (err) {
+                console.error('❌ An error occurred while retrieving token:', err);
+                showStatus(`❌ Error generating token: ${err.message}`, 'error');
+                return null;
+            }
+        };
+
+        // Test the token by sending it to our server
+        window.testToken = async function() {
+            const token = window.currentFCMToken;
+            if (!token) {
+                showStatus('❌ No token available. Generate a token first.', 'error');
+                return;
+            }
+
+            try {
+                showStatus('🧪 Testing token with notification server...', 'info');
+                console.log('🧪 Testing token:', token);
+
+                const response = await fetch('http://localhost:3002/api/send-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token: token,
+                        title: '🎉 Web FCM Test Success!',
+                        body: 'This notification was sent to your browser using the web FCM token!'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    console.log('✅ Test notification sent successfully:', result);
+                    showStatus('✅ Test notification sent successfully! Check your browser for the notification.', 'success');
+                } else {
+                    console.error('❌ Test notification failed:', result);
+                    showStatus(`❌ Test failed: ${result.error || result.details}`, 'error');
+                }
+            } catch (error) {
+                console.error('❌ Error testing token:', error);
+                showStatus(`❌ Error testing token: ${error.message}`, 'error');
+            }
+        };
+
+        // Copy token to clipboard
+        window.copyToken = async function() {
+            const token = document.getElementById('web-fcm-token').textContent;
+            try {
+                await navigator.clipboard.writeText(token);
+                showStatus('✅ Token copied to clipboard!', 'success');
+            } catch (err) {
+                console.error('Failed to copy token:', err);
+                showStatus('❌ Failed to copy token. Please copy manually.', 'error');
+            }
+        };
+
+        // Handle incoming messages
+        onMessage(messaging, (payload) => {
+            console.log('✅ Message received in foreground:', payload);
+            
+            if (payload.notification) {
+                showStatus(`📨 Received: ${payload.notification.title} - ${payload.notification.body}`, 'success');
+            }
+        });
+
+        // Make Firebase objects available globally for console use
+        window.messaging = messaging;
+        window.firebaseApp = app;
+        window.getFCMToken = generateToken;
+        window.requestNotificationPermission = requestPermission;
+
+        console.log('🚀 Firebase Web FCM setup complete!');
+        console.log('📱 Available commands:');
+        console.log('  - requestNotificationPermission()');
+        console.log('  - getFCMToken()');
+        console.log('  - messaging (Firebase messaging instance)');
+    </script>
+</body>
+</html>
