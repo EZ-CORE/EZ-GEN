@@ -1,0 +1,56 @@
+<ion-app>
+  <!-- Loading state for native apps - outside ion-content -->
+  <div *ngIf="isLoading && !loadingError" 
+       class="loading-overlay"
+       style="position: fixed !important; 
+              top: 0 !important; 
+              left: 0 !important; 
+              right: 0 !important; 
+              bottom: 0 !important; 
+              width: 100vw !important; 
+              height: 100vh !important; 
+              display: flex !important; 
+              justify-content: center !important; 
+              align-items: center !important; 
+              z-index: 99999 !important; 
+              margin: 0 !important; 
+              padding: 0 !important;">
+    <ion-spinner name="crescent" color="primary" 
+                 (click)="onLoadingClick()"
+                 style="--color: white !important; 
+                        transform: scale(1.5) !important; 
+                        margin: 0 !important; 
+                        padding: 0 !important;"></ion-spinner>
+  </div>
+
+  <ion-content class="full-height">
+    <!-- Error state with controls -->
+    <div *ngIf="loadingError" class="error-container">
+      <ion-text color="medium">
+        <h2>Website Loading Issue</h2>
+        <p>Unable to load the website. Please check your internet connection or try again.</p>
+      </ion-text>
+      
+      <ion-button expand="block" (click)="reloadWebsite()" class="action-button">
+        <ion-icon name="refresh" slot="start"></ion-icon>
+        Try Again
+      </ion-button>
+      
+      <ion-button expand="block" fill="outline" (click)="openInExternalBrowser()" class="action-button">
+        <ion-icon name="globe" slot="start"></ion-icon>
+        Open in External Browser
+      </ion-button>
+    </div>
+
+    <!-- Iframe fallback for web platform only -->
+    <iframe 
+      *ngIf="showContent && !isNative && !loadingError"
+      [src]="safeUrl" 
+      class="main-iframe"
+      (load)="onIframeLoad()"
+      (error)="onIframeError()"
+      sandbox="allow-same-origin allow-scripts allow-forms allow-navigation allow-popups allow-top-navigation allow-modals"
+      allowfullscreen>
+    </iframe>
+  </ion-content>
+</ion-app>

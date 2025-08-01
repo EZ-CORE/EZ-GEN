@@ -1,0 +1,9 @@
+{
+  "token": "fcoCWMX-TEOf5n9__Btgaj:APA91bFM8srX7--F1_Mm8tWJwV4IFnQAb0SFGAlPI7k-HzKsDAiodGb8yBCIF_ngVVjO4YkJVTpsSkRSkaLAdhGXlESokxSwyCrNI5z7XMVH1V9ezSnhqTZboI8ospm9FM3qQkhG0JGq",
+  "title": "🎉 Success!",
+  "body": "Your Timeless app push notifications are working perfectly!",
+  "data": {
+    "url": "https://example.com",
+    "action": "open_app"
+  }
+}

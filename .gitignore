@@ -1,0 +1,10 @@
+node_modules/
+generated-apps/
+apks/
+push-notification-system/firebase-setup/service-account-key.json
+push-notification-system/firebase-setup/service-account.json
+Firebase/*.json
+*.key.json
+*-adminsdk-*.json
+*.env
+.env*
