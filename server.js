@@ -119,6 +119,16 @@ function validateWebsiteUrl(url) {
     return { isValid: false, message: 'Website URL is required' };
   }
   
+  // Check for basic invalid characters that shouldn't be in URLs
+  if (/['"`\s]/.test(url)) {
+    return { isValid: false, message: 'Website URL contains invalid characters (quotes, spaces not allowed)' };
+  }
+  
+  // Check for proper URL format (must have :// after protocol)
+  if (/^https?:[^\/]/.test(url)) {
+    return { isValid: false, message: 'Invalid URL format. Use https:// or http:// (e.g., https://example.com)' };
+  }
+  
   try {
     const urlObj = new URL(url);
     
@@ -132,12 +142,30 @@ function validateWebsiteUrl(url) {
       return { isValid: false, message: 'Website URL must have a valid hostname' };
     }
     
-    // Should not be localhost for production apps (warning, not error)
+    // Check for localhost (special case)
     if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
       return { 
         isValid: true, 
         warning: 'Warning: Using localhost URL - this will only work for local testing' 
       };
+    }
+    
+    // Check for valid domain format (must have at least one dot for TLD)
+    if (!urlObj.hostname.includes('.')) {
+      return { isValid: false, message: 'Website URL must have a valid domain with extension (e.g., example.com)' };
+    }
+    
+    // Check for valid hostname format (basic domain validation)
+    const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    if (!hostnameRegex.test(urlObj.hostname)) {
+      return { isValid: false, message: 'Website URL must have a valid domain name (e.g., example.com)' };
+    }
+    
+    // Check for valid TLD (must end with at least 2 letter extension)
+    const parts = urlObj.hostname.split('.');
+    const tld = parts[parts.length - 1];
+    if (!/^[a-zA-Z]{2,}$/.test(tld)) {
+      return { isValid: false, message: 'Website URL must have a valid domain extension (e.g., .com, .org, .net)' };
     }
     
     return { isValid: true };
@@ -168,26 +196,30 @@ function validatePackageName(packageName) {
   
   // Check for reserved words and common mistakes
   const parts = packageName.split('.');
-  const reservedWords = ['android', 'java', 'javax', 'com.android', 'com.google'];
-  
-  if (parts.length < 2) {
-    return { isValid: false, message: 'Package name must have at least 2 parts separated by dots (e.g., com.company)' };
-  }
-  
+  const reservedPrefixes = ['com.android', 'com.google', 'java', 'javax'];
+  const reservedWords = ['android', 'java', 'javax'];
+
   if (parts.length < 3) {
-    return { 
-      isValid: true, 
-      warning: 'Consider using 3 parts for better uniqueness (e.g., com.company.appname)' 
-    };
+    return { isValid: false, message: 'Package name must have exactly 3 parts separated by dots (e.g., com.company.appname)' };
   }
-  
-  for (const part of parts) {
-    if (reservedWords.includes(part) || packageName.startsWith(part + '.')) {
-      return { isValid: false, message: `Package name cannot use reserved word: ${part}` };
+
+  if (parts.length > 5) {
+    return { isValid: false, message: 'Package name should not have more than 5 parts for simplicity' };
+  }
+
+  // Check for reserved prefixes (full package starts)
+  for (const prefix of reservedPrefixes) {
+    if (packageName.startsWith(prefix + '.') || packageName === prefix) {
+      return { isValid: false, message: `Package name cannot start with reserved prefix: ${prefix}` };
     }
   }
-  
-  return { isValid: true };
+
+  // Check for reserved words in individual parts (excluding common TLDs like 'com')
+  for (const part of parts) {
+    if (reservedWords.includes(part)) {
+      return { isValid: false, message: `Package name cannot use reserved word: ${part}` };
+    }
+  }  return { isValid: true };
 }
 
 // Routes

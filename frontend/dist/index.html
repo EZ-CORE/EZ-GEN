@@ -463,6 +463,24 @@
             const warningDiv = document.getElementById('websiteUrlWarning');
             const input = document.getElementById('websiteUrl');
             
+            // Check for empty or invalid input
+            if (!url || url.trim() === '') {
+                showError(input, errorDiv, 'Website URL is required');
+                return false;
+            }
+            
+            // Check for basic invalid characters that shouldn't be in URLs
+            if (/['"`\s]/.test(url)) {
+                showError(input, errorDiv, 'Website URL contains invalid characters (quotes, spaces not allowed)');
+                return false;
+            }
+            
+            // Check for proper URL format (must have :// after protocol)
+            if (/^https?:[^\/]/.test(url)) {
+                showError(input, errorDiv, 'Invalid URL format. Use https:// or http:// (e.g., https://example.com)');
+                return false;
+            }
+            
             try {
                 const urlObj = new URL(url);
                 
@@ -476,15 +494,36 @@
                     return false;
                 }
                 
-                // Check for localhost warning
+                // Check for localhost (special case)
                 if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
                     hideError(input, errorDiv);
                     showWarning(warningDiv, 'Warning: Using localhost URL - this will only work for local testing');
-                } else {
-                    hideError(input, errorDiv);
-                    hideWarning(warningDiv);
+                    return true;
                 }
                 
+                // Check for valid domain format (must have at least one dot for TLD)
+                if (!urlObj.hostname.includes('.')) {
+                    showError(input, errorDiv, 'Website URL must have a valid domain with extension (e.g., example.com)');
+                    return false;
+                }
+                
+                // Check for valid hostname format (basic domain validation)
+                const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+                if (!hostnameRegex.test(urlObj.hostname)) {
+                    showError(input, errorDiv, 'Website URL must have a valid domain name (e.g., example.com)');
+                    return false;
+                }
+                
+                // Check for valid TLD (must end with at least 2 letter extension)
+                const parts = urlObj.hostname.split('.');
+                const tld = parts[parts.length - 1];
+                if (!/^[a-zA-Z]{2,}$/.test(tld)) {
+                    showError(input, errorDiv, 'Website URL must have a valid domain extension (e.g., .com, .org, .net)');
+                    return false;
+                }
+                
+                hideError(input, errorDiv);
+                hideWarning(warningDiv);
                 return true;
             } catch (error) {
                 showError(input, errorDiv, 'Invalid URL format. Please enter a valid website URL (e.g., https://example.com)');
@@ -513,12 +552,17 @@
             
             const parts = packageName.split('.');
             if (parts.length < 3) {
-                hideError(input, errorDiv);
-                showWarning(warningDiv, 'Consider using 3 parts for better uniqueness (e.g., com.company.appname)');
-            } else {
-                hideError(input, errorDiv);
-                hideWarning(warningDiv);
+                showError(input, errorDiv, 'Package name must have exactly 3 parts separated by dots (e.g., com.company.appname)');
+                return false;
             }
+            
+            if (parts.length > 5) {
+                showError(input, errorDiv, 'Package name should not have more than 5 parts for simplicity');
+                return false;
+            }
+            
+            hideError(input, errorDiv);
+            hideWarning(warningDiv);
             
             return true;
         }
