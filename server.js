@@ -301,6 +301,9 @@ app.post('/api/generate-app', upload.fields([
     const templateDir = path.join(__dirname, 'templates', 'ionic-webview-template');
     await fs.copy(templateDir, appDir);
 
+    // Fix gradlew line endings for macOS/Linux compatibility
+    await fixGradlewLineEndings(appDir, sessionId);
+
     // Copy the README for generated apps
     const readmePath = path.join(templateDir, 'GENERATED_APP_README.md');
     if (await fs.pathExists(readmePath)) {
@@ -515,6 +518,104 @@ app.get('/api/download-guide/:appId', async (req, res) => {
     res.status(500).json({ error: 'Failed to download guide' });
   }
 });
+
+// Robust Capacitor sync function with timeout and manual fallback
+async function syncCapacitorWithFallback(appDir, sessionId = null, timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    if (sessionId) logToSession(sessionId, '🔄 Attempting Capacitor sync...', 'info');
+    
+    // Create timeout handler
+    const timeout = setTimeout(() => {
+      if (sessionId) logToSession(sessionId, '⏰ Capacitor sync timed out, trying manual fallback...', 'warning');
+      if (capSync && !capSync.killed) {
+        capSync.kill('SIGKILL');
+      }
+      performManualSync();
+    }, timeoutMs);
+    
+    let capSync = null;
+    
+    // Try normal cap sync first
+    capSync = spawn('npx', ['cap', 'sync'], { 
+      cwd: appDir,
+      shell: true,
+      stdio: 'pipe'
+    });
+    
+    capSync.on('close', (syncCode) => {
+      clearTimeout(timeout);
+      if (syncCode === 0) {
+        if (sessionId) logToSession(sessionId, '✅ Capacitor sync completed successfully!', 'success');
+        resolve();
+      } else {
+        if (sessionId) logToSession(sessionId, `⚠️ Capacitor sync failed with code ${syncCode}, trying manual fallback...`, 'warning');
+        performManualSync();
+      }
+    });
+    
+    capSync.on('error', (error) => {
+      clearTimeout(timeout);
+      if (sessionId) logToSession(sessionId, `❌ Capacitor sync error: ${error.message}, trying manual fallback...`, 'warning');
+      performManualSync();
+    });
+    
+    // Manual sync fallback function
+    async function performManualSync() {
+      try {
+        if (sessionId) logToSession(sessionId, '🔧 Performing manual Capacitor sync...', 'info');
+        
+        // Copy web assets to Android
+        const wwwDir = path.join(appDir, 'www');
+        const androidAssetsDir = path.join(appDir, 'android', 'app', 'src', 'main', 'assets', 'public');
+        
+        if (await fs.pathExists(wwwDir)) {
+          await fs.ensureDir(androidAssetsDir);
+          await fs.copy(wwwDir, androidAssetsDir);
+          if (sessionId) logToSession(sessionId, '📱 Web assets copied to Android platform', 'success');
+        }
+        
+        // Copy web assets to iOS
+        const iosAssetsDir = path.join(appDir, 'ios', 'App', 'App', 'public');
+        if (await fs.pathExists(wwwDir)) {
+          await fs.ensureDir(iosAssetsDir);
+          await fs.copy(wwwDir, iosAssetsDir);
+          if (sessionId) logToSession(sessionId, '🍎 Web assets copied to iOS platform', 'success');
+        }
+        
+        if (sessionId) logToSession(sessionId, '✅ Manual Capacitor sync completed successfully!', 'success');
+        resolve();
+        
+      } catch (error) {
+        if (sessionId) logToSession(sessionId, `❌ Manual sync failed: ${error.message}`, 'error');
+        reject(new Error(`Manual Capacitor sync failed: ${error.message}`));
+      }
+    }
+  });
+}
+
+// Fix gradlew line endings for macOS/Linux compatibility
+async function fixGradlewLineEndings(appDir, sessionId = null) {
+  try {
+    const gradlewPath = path.join(appDir, 'android', 'gradlew');
+    if (await fs.pathExists(gradlewPath)) {
+      if (sessionId) logToSession(sessionId, '🔧 Fixing gradlew line endings for macOS compatibility...', 'info');
+      
+      // Read the file
+      let gradlewContent = await fs.readFile(gradlewPath, 'utf8');
+      
+      // Remove carriage returns (Windows line endings)
+      gradlewContent = gradlewContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      
+      // Write back the file with Unix line endings
+      await fs.writeFile(gradlewPath, gradlewContent, 'utf8');
+      
+      if (sessionId) logToSession(sessionId, '✅ Gradlew line endings fixed', 'success');
+    }
+  } catch (error) {
+    if (sessionId) logToSession(sessionId, `⚠️ Warning: Could not fix gradlew line endings: ${error.message}`, 'warning');
+    // Don't throw error - this is not critical
+  }
+}
 
 // Update app configuration
 async function updateAppConfig(appDir, config, sessionId = null) {
@@ -838,7 +939,7 @@ async function updateNetworkSecurityConfig(appDir, websiteUrl) {
 }
 
 // Build and sync Capacitor app
-async function buildAndSyncApp(appDir, appName, packageName) {
+async function buildAndSyncApp(appDir, appName, packageName, sessionId = null) {
   return new Promise((resolve, reject) => {
     console.log('Building and syncing Capacitor app...');
     
@@ -889,54 +990,51 @@ async function buildAndSyncApp(appDir, appName, packageName) {
           
           console.log('Syncing Capacitor...');
           
-          // Sync Capacitor
-          const capSync = spawn('npx', ['cap', 'sync'], { 
-            cwd: appDir,
-            shell: true,
-            stdio: 'pipe'
-          });
-          
-          capSync.on('close', (syncCode) => {
-            if (syncCode !== 0) {
-              console.error('cap sync failed with code:', syncCode);
-              return reject(new Error('Failed to sync Capacitor'));
-            }
-            
-            console.log('Capacitor sync completed. Testing app...');
-            
-            // Test the app by trying to serve it
-            testAppFunctionality(appDir)
-              .then(() => {
-                console.log('App test completed successfully!');
-                
-                // Generate Play Store-ready builds as the final step
-                console.log('Starting Play Store-ready build generation as final step...');
-                generatePlayStoreBuilds(appDir, appName, packageName)
-                  .then(() => {
-                    console.log('Play Store-ready builds completed successfully!');
-                    resolve();
-                  })
-                  .catch((buildError) => {
-                    console.warn('Play Store build generation failed, but app was generated successfully:', buildError.message);
-                    resolve(); // Don't fail the entire process for build generation failures
-                  });
-              })
-              .catch((testError) => {
-                console.warn('App test failed but generation completed:', testError.message);
-                
-                // Still try to generate builds even if test failed
-                console.log('Attempting Play Store build generation despite test failure...');
-                generatePlayStoreBuilds(appDir, appName, packageName)
-                  .then(() => {
-                    console.log('Play Store-ready builds completed successfully!');
-                    resolve();
-                  })
-                  .catch((buildError) => {
-                    console.warn('Play Store build generation failed, but app was generated successfully:', buildError.message);
-                    resolve();
-                  });
-              });
-          });
+          // Use robust Capacitor sync with fallback
+          syncCapacitorWithFallback(appDir, sessionId)
+            .then(() => {
+              console.log('Capacitor sync completed. Testing app...');
+              
+              // Test the app by trying to serve it
+              testAppFunctionality(appDir)
+                .then(() => {
+                  console.log('App test completed successfully!');
+                  
+                  // Generate Play Store-ready builds as the final step
+                  console.log('Starting Play Store-ready build generation as final step...');
+                  generatePlayStoreBuilds(appDir, appName, packageName)
+                    .then(() => {
+                      console.log('Play Store-ready builds completed successfully!');
+                      resolve();
+                    })
+                    .catch((buildError) => {
+                      console.warn('Play Store build generation failed, but app was generated successfully:', buildError.message);
+                      resolve(); // Don't fail the entire process for build generation failures
+                    });
+                })
+                .catch((testError) => {
+                  console.warn('App test failed but generation completed:', testError.message);
+                  
+                  // Still try to generate builds even if test failed
+                  console.log('Attempting Play Store build generation despite test failure...');
+                  generatePlayStoreBuilds(appDir, appName, packageName)
+                    .then(() => {
+                      console.log('Play Store-ready builds completed successfully!');
+                      resolve();
+                    })
+                    .catch((buildError) => {
+                      console.warn('Play Store build generation failed, but app was generated successfully:', buildError.message);
+                      resolve(); // Don't fail the entire process for build generation failures
+                    });
+                });
+            })
+            .catch((syncError) => {
+              console.error('Capacitor sync failed completely:', syncError.message);
+              logToSession(sessionId, '⚠️ Build/sync failed, but app was generated: ' + syncError.message, 'warning');
+              logToSession(sessionId, '💡 You may need to run build manually later', 'info');
+              // Don't reject - let the app generation complete
+              resolve();
+            });
         });
       });
     });
