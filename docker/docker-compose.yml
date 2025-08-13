@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  ez-gen:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ez-gen-app
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist generated apps
+      - ../generated-apps:/app/generated-apps
+      # Persist uploads temporarily
+      - ../uploads:/app/uploads
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+      - ANDROID_SDK_ROOT=/opt/android-sdk
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ez-gen-network
+
+networks:
+  ez-gen-network:
+    driver: bridge

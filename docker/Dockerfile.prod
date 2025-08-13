@@ -1,0 +1,109 @@
+# Multi-stage build for smaller production image
+FROM ubuntu:22.04 as builder
+
+# Avoid prompts from apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    unzip \
+    git \
+    build-essential \
+    python3 \
+    python3-pip \
+    openjdk-21-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20.x
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+# Set environment variables
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV PATH=$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+
+# Install Android SDK
+RUN mkdir -p $ANDROID_SDK_ROOT \
+    && cd $ANDROID_SDK_ROOT \
+    && wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+    && unzip -q commandlinetools-linux-11076708_latest.zip \
+    && rm commandlinetools-linux-11076708_latest.zip \
+    && mkdir -p cmdline-tools/latest \
+    && mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true \
+    && rmdir cmdline-tools/cmdline-tools 2>/dev/null || true
+
+# Accept licenses and install SDK components
+RUN yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 \
+    && $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+        "platform-tools" \
+        "platforms;android-34" \
+        "build-tools;34.0.0" \
+        >/dev/null 2>&1
+
+# Production stage
+FROM ubuntu:22.04
+
+# Avoid prompts from apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    openjdk-21-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20.x
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV PATH=$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+ENV NODE_ENV=production
+
+# Copy Android SDK from builder stage
+COPY --from=builder $ANDROID_SDK_ROOT $ANDROID_SDK_ROOT
+
+# Install global npm packages
+RUN npm install -g @ionic/cli @capacitor/cli
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user
+RUN useradd -m -s /bin/bash ezgen
+
+# Copy package files
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy application code
+COPY . .
+
+# Create necessary directories and set permissions
+RUN mkdir -p uploads generated-apps \
+    && chmod +x *.sh 2>/dev/null || true \
+    && find templates -name "gradlew" -exec chmod +x {} \; 2>/dev/null || true \
+    && chown -R ezgen:ezgen /app \
+    && chown -R ezgen:ezgen $ANDROID_SDK_ROOT
+
+# Switch to non-root user
+USER ezgen
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
+
+# Start application
+CMD ["node", "server.js"]
