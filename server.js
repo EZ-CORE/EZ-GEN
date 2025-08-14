@@ -629,9 +629,11 @@ async function fixAndroidConfigPaths(appDir, sessionId = null) {
       if (sessionId) logToSession(sessionId, '🔧 Updating Android SDK paths for environment...', 'info');
       
       const androidSdkPath = process.env.ANDROID_SDK_ROOT || process.env.ANDROID_HOME || '/opt/android-sdk';
+      // Escape backslashes for Windows paths in properties file
+      const escapedSdkPath = androidSdkPath.replace(/\\/g, '\\\\');
       const localPropertiesContent = `## This file is auto-generated for cross-platform compatibility
 # Location of the SDK. This is only used by Gradle.
-sdk.dir=${androidSdkPath}
+sdk.dir=${escapedSdkPath}
 `;
       
       await fs.writeFile(localPropertiesPath, localPropertiesContent, 'utf8');
