@@ -64,6 +64,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # Set environment variables
 ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
 ENV NODE_ENV=production
 

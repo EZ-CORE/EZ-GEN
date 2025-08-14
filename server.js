@@ -304,6 +304,9 @@ app.post('/api/generate-app', upload.fields([
     // Fix gradlew line endings for macOS/Linux compatibility
     await fixGradlewLineEndings(appDir, sessionId);
 
+    // Fix Android configuration paths for cross-platform compatibility
+    await fixAndroidConfigPaths(appDir, sessionId);
+
     // Copy the README for generated apps
     const readmePath = path.join(templateDir, 'GENERATED_APP_README.md');
     if (await fs.pathExists(readmePath)) {
@@ -613,6 +616,45 @@ async function fixGradlewLineEndings(appDir, sessionId = null) {
     }
   } catch (error) {
     if (sessionId) logToSession(sessionId, `⚠️ Warning: Could not fix gradlew line endings: ${error.message}`, 'warning');
+    // Don't throw error - this is not critical
+  }
+}
+
+// Fix Android configuration paths for cross-platform compatibility
+async function fixAndroidConfigPaths(appDir, sessionId = null) {
+  try {
+    // Fix local.properties for Android SDK path
+    const localPropertiesPath = path.join(appDir, 'android', 'local.properties');
+    if (await fs.pathExists(localPropertiesPath)) {
+      if (sessionId) logToSession(sessionId, '🔧 Updating Android SDK paths for environment...', 'info');
+      
+      const androidSdkPath = process.env.ANDROID_SDK_ROOT || process.env.ANDROID_HOME || '/opt/android-sdk';
+      const localPropertiesContent = `## This file is auto-generated for cross-platform compatibility
+# Location of the SDK. This is only used by Gradle.
+sdk.dir=${androidSdkPath}
+`;
+      
+      await fs.writeFile(localPropertiesPath, localPropertiesContent, 'utf8');
+      if (sessionId) logToSession(sessionId, `✅ Android SDK path set to: ${androidSdkPath}`, 'success');
+    }
+
+    // Fix Gradle config.properties for Java path
+    const gradleConfigDir = path.join(appDir, 'android', '.gradle');
+    const configPropertiesPath = path.join(gradleConfigDir, 'config.properties');
+    
+    // Ensure .gradle directory exists
+    await fs.ensureDir(gradleConfigDir);
+    
+    const javaHome = process.env.JAVA_HOME || '/usr/lib/jvm/java-21-openjdk-amd64';
+    const configPropertiesContent = `# Auto-generated for cross-platform compatibility
+java.home=${javaHome}
+`;
+    
+    await fs.writeFile(configPropertiesPath, configPropertiesContent, 'utf8');
+    if (sessionId) logToSession(sessionId, `✅ Java home set to: ${javaHome}`, 'success');
+    
+  } catch (error) {
+    if (sessionId) logToSession(sessionId, `⚠️ Warning: Could not fix Android config paths: ${error.message}`, 'warning');
     // Don't throw error - this is not critical
   }
 }
