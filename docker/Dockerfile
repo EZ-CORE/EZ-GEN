@@ -29,6 +29,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # Create Android SDK directory and set environment variables
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
 
 # Install Android SDK
@@ -64,10 +65,11 @@ RUN npm ci --only=production
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads generated-apps
+RUN mkdir -p uploads generated-apps apks
 
 # Set proper permissions
 RUN chmod +x *.sh 2>/dev/null || true \
+    && chmod +x scripts/*.sh 2>/dev/null || true \
     && find templates -name "gradlew" -exec chmod +x {} \; 2>/dev/null || true
 
 # Create a non-root user for security

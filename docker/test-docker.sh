@@ -36,6 +36,7 @@ show_usage() {
     echo ""
     echo "Commands:"
     echo "  test          Run full test suite"
+    echo "  check-env     Check build environment inside container"
     echo "  build         Build the Docker image (dev)"
     echo "  build-prod    Build production Docker image"
     echo "  run           Run the container"
@@ -119,12 +120,14 @@ run_tests() {
             docker logs ez-gen-test | tail -10
         fi
         
-        # Test 6: Test app generation (if container is responding)
+        # Test 6: Test environment inside container
         if curl -f http://localhost:3001 >/dev/null 2>&1; then
-            print_info "Test 6: Testing app generation API..."
-            # This is a basic test - in real scenario you'd test the full API
-            if curl -f http://localhost:3001 >/dev/null 2>&1; then
-                print_success "API is accessible"
+            print_info "Test 6: Testing build environment inside container..."
+            if docker exec ez-gen-test npm run check-environment >/dev/null 2>&1; then
+                print_success "Container build environment is properly configured"
+            else
+                print_warning "Build environment check failed inside container"
+                docker exec ez-gen-test npm run check-environment || true
             fi
         fi
         
@@ -348,6 +351,30 @@ check_health() {
     fi
 }
 
+# Function to check build environment inside container
+check_environment() {
+    print_info "Checking build environment inside container..."
+    
+    if docker-compose -f docker-compose.prod.yml ps | grep -q ez-gen; then
+        print_info "Running environment check in production container..."
+        docker-compose -f docker-compose.prod.yml exec ez-gen npm run check-environment
+    elif docker-compose ps | grep -q ez-gen; then
+        print_info "Running environment check in development container..."
+        docker-compose exec ez-gen npm run check-environment
+    elif docker ps | grep -q ez-gen-app; then
+        print_info "Running environment check in standalone container..."
+        docker exec -it ez-gen-app npm run check-environment
+    else
+        print_error "No running EZ-GEN containers found!"
+        print_info "Starting a temporary container to check environment..."
+        if docker run --rm -it ez-gen:latest npm run check-environment; then
+            print_success "Environment check completed in temporary container"
+        else
+            print_error "Failed to run environment check. Build the image first with: ./test-docker.sh build"
+        fi
+    fi
+}
+
 # Ensure we're in the docker directory
 cd "$(dirname "$0")"
 
@@ -355,6 +382,10 @@ cd "$(dirname "$0")"
 case "${1:-}" in
     "test")
         run_tests
+        ;;
+    "check-env")
+        check_docker
+        check_environment
         ;;
     "build")
         check_docker

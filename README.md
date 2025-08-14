@@ -42,7 +42,48 @@ A white-label app generator that creates native Android/iOS apps from any websit
 4. **Open in browser:**
    Navigate to `http://localhost:3000`
 
-## 🐧 Linux Server Deployment
+## � Docker Deployment (Recommended)
+
+For easy deployment with all dependencies included:
+
+```bash
+# Navigate to docker directory
+cd docker
+
+# Start with Docker Compose (easiest)
+./test-docker.sh start          # Linux/macOS/WSL
+docker-manage.bat start         # Windows
+
+# Or start production setup
+./test-docker.sh start-prod     # With Nginx proxy
+docker-manage.bat start-prod    # Windows production
+```
+
+**Docker Benefits:**
+- ✅ All dependencies pre-installed (Java, Android SDK, Node.js)
+- ✅ Consistent environment across all platforms
+- ✅ No local Android SDK setup required
+- ✅ Isolated from host system
+- ✅ Easy scaling and deployment
+
+**Quick Docker Commands:**
+```bash
+# Check status
+./test-docker.sh status
+
+# View logs
+./test-docker.sh logs
+
+# Access container shell
+./test-docker.sh shell
+
+# Test full setup
+./test-docker.sh test
+```
+
+See [docker/QUICK-START.md](docker/QUICK-START.md) for complete Docker guide.
+
+## �🐧 Linux Server Deployment
 
 For Linux server deployment, see [LINUX-DEPLOYMENT.md](LINUX-DEPLOYMENT.md) for complete setup instructions including:
 - Java/Android SDK installation
@@ -124,6 +165,34 @@ npx cap open ios      # Open in Xcode (macOS only)
 ```
 
 ## 🔧 Troubleshooting
+
+### Build Environment Issues
+
+If you encounter "Release build failed with exit code: 1" or similar build errors, you have several options:
+
+**Option 1: Use Docker (Recommended)**
+```bash
+# Docker handles all build dependencies automatically
+cd docker
+./test-docker.sh start          # Linux/macOS/WSL
+docker-manage.bat start         # Windows
+```
+
+**Option 2: Check Local Environment**
+```bash
+# Windows
+scripts\check-build-environment.bat
+
+# Linux/macOS  
+./scripts/check-build-environment.sh
+
+# Or via npm
+npm run check-environment
+```
+
+This will verify that you have all required tools installed (Java, Android SDK, etc.).
+
+For detailed troubleshooting, see: [DOCS/ANDROID-BUILD-TROUBLESHOOTING.md](DOCS/ANDROID-BUILD-TROUBLESHOOTING.md)
 
 ### Gradle Error: "capacitor.settings.gradle not found"
 

@@ -12,6 +12,10 @@ generated-apps/*
 uploads/*
 !uploads/.gitkeep
 
+# Generated APKs (these will be created at runtime)
+apks/*
+!apks/.gitkeep
+
 # Git
 .git
 .gitignore

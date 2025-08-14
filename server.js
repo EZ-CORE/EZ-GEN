@@ -1330,6 +1330,12 @@ async function generateReleaseBuilds(appDir, appName, keystoreInfo) {
     const androidDir = path.join(appDir, 'android');
     const gradlewCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     
+    // Check Android SDK and Java environment
+    console.log('🔍 Checking build environment...');
+    console.log('ANDROID_HOME:', process.env.ANDROID_HOME || 'Not set');
+    console.log('ANDROID_SDK_ROOT:', process.env.ANDROID_SDK_ROOT || 'Not set');
+    console.log('JAVA_HOME:', process.env.JAVA_HOME || 'Not set');
+    
     // Make gradlew executable on Unix-like systems
     if (process.platform !== 'win32') {
       const gradlewPath = path.join(androidDir, 'gradlew');
@@ -1346,132 +1352,193 @@ async function generateReleaseBuilds(appDir, appName, keystoreInfo) {
       }
     }
     
-    // First, let's try building just the release APK to see if signing works
-    console.log('📱 Building release APK first...');
-    
-    const gradleBuild = spawn(gradlewCmd, ['assembleRelease'], {
+    // Try a clean build first
+    console.log('🧹 Cleaning previous builds...');
+    const cleanBuild = spawn(gradlewCmd, ['clean'], {
       cwd: androidDir,
       shell: true,
       stdio: 'pipe'
     });
     
-    let buildOutput = '';
-    gradleBuild.stdout.on('data', (data) => {
-      buildOutput += data.toString();
+    let cleanOutput = '';
+    cleanBuild.stdout.on('data', (data) => {
+      cleanOutput += data.toString();
     });
     
-    gradleBuild.stderr.on('data', (data) => {
-      buildOutput += data.toString();
+    cleanBuild.stderr.on('data', (data) => {
+      cleanOutput += data.toString();
     });
     
-    gradleBuild.on('close', (code) => {
-      if (code !== 0) {
-        console.log('⚠️  Release APK build failed with exit code:', code);
-        console.log('🔍 Full build output:');
-        console.log(buildOutput);
-        return reject(new Error(`Release build failed with exit code: ${code}`));
+    cleanBuild.on('close', (cleanCode) => {
+      if (cleanCode !== 0) {
+        console.log('⚠️  Clean failed, but continuing with build...');
+        console.log('Clean output:', cleanOutput.slice(-500));
+      } else {
+        console.log('✅ Clean completed successfully');
       }
       
-      console.log('✅ Release APK build completed successfully!');
+      // First, let's try building just the release APK to see if signing works
+      console.log('📱 Building release APK...');
+      console.log('🔧 Command:', `${gradlewCmd} assembleRelease`);
+      console.log('📁 Working directory:', androidDir);
       
-      // Now try building the AAB
-      console.log('📦 Building Android App Bundle (AAB)...');
-      
-      const aabBuild = spawn(gradlewCmd, ['bundleRelease'], {
+      const gradleBuild = spawn(gradlewCmd, ['assembleRelease', '--stacktrace', '--info'], {
         cwd: androidDir,
         shell: true,
-        stdio: 'pipe'
+        stdio: 'pipe',
+        env: {
+          ...process.env,
+          // Ensure Android environment variables are set
+          ANDROID_HOME: process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || '/opt/android-sdk',
+          ANDROID_SDK_ROOT: process.env.ANDROID_SDK_ROOT || process.env.ANDROID_HOME || '/opt/android-sdk',
+        }
       });
       
-      let aabOutput = '';
-      aabBuild.stdout.on('data', (data) => {
-        aabOutput += data.toString();
+      let buildOutput = '';
+      gradleBuild.stdout.on('data', (data) => {
+        const output = data.toString();
+        buildOutput += output;
+        // Log real-time progress for critical steps
+        if (output.includes('BUILD SUCCESSFUL') || output.includes('BUILD FAILED') || output.includes('FAILURE:')) {
+          console.log('📋 Build status:', output.trim());
+        }
       });
       
-      aabBuild.stderr.on('data', (data) => {
-        aabOutput += data.toString();
+      gradleBuild.stderr.on('data', (data) => {
+        const output = data.toString();
+        buildOutput += output;
+        // Log errors in real-time
+        if (output.includes('ERROR') || output.includes('FAILURE')) {
+          console.log('❌ Build error:', output.trim());
+        }
       });
       
-      aabBuild.on('close', (aabCode) => {
-        if (aabCode !== 0) {
-          console.log('⚠️  AAB build failed, but APK succeeded. Continuing...');
-          console.log('🔍 AAB build output:', aabOutput.slice(-1000));
-        } else {
-          console.log('✅ AAB build completed successfully!');
+      gradleBuild.on('close', (code) => {
+        if (code !== 0) {
+          console.log('⚠️  Release APK build failed with exit code:', code);
+          console.log('🔍 Build environment check:');
+          console.log(`  - Gradle wrapper: ${gradlewCmd}`);
+          console.log(`  - Android directory exists: ${fs.existsSync(androidDir)}`);
+          console.log(`  - build.gradle exists: ${fs.existsSync(path.join(androidDir, 'app', 'build.gradle'))}`);
+          
+          // Extract key error messages
+          const errorLines = buildOutput.split('\n').filter(line => 
+            line.includes('FAILURE:') || 
+            line.includes('ERROR') || 
+            line.includes('Exception') ||
+            line.includes('Task :') && line.includes('FAILED')
+          );
+          
+          console.log('🔍 Key error messages:');
+          errorLines.slice(-10).forEach(line => console.log('  ', line.trim()));
+          
+          console.log('🔍 Full build output (last 2000 chars):');
+          console.log(buildOutput.slice(-2000));
+          
+          return reject(new Error(`Release build failed with exit code: ${code}. Check logs above for details.`));
         }
         
-        // Find and organize the generated files
-        const apkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release');
-        const aabDir = path.join(androidDir, 'app', 'build', 'outputs', 'bundle', 'release');
+        console.log('✅ Release APK build completed successfully!');
         
-        const cleanAppName = appName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-        const apksDir = path.join(__dirname, 'apks');
-        fs.ensureDirSync(apksDir);
+        // Now try building the AAB
+        console.log('📦 Building Android App Bundle (AAB)...');
         
-        const results = {
-          apk: null,
-          aab: null,
-          debug: null
-        };
-        
-        // Copy release APK
-        if (fs.existsSync(apkDir)) {
-          const apkFiles = fs.readdirSync(apkDir).filter(f => f.endsWith('.apk'));
-          if (apkFiles.length > 0) {
-            const sourceApk = path.join(apkDir, apkFiles[0]);
-            const finalApkName = `${cleanAppName}-release.apk`;
-            const finalApkPath = path.join(apksDir, finalApkName);
-            
-            fs.copyFileSync(sourceApk, finalApkPath);
-            results.apk = finalApkName;
-            console.log(`📱 Release APK: ${finalApkName}`);
-          }
-        }
-        
-        // Copy AAB for Play Store if it exists
-        if (aabCode === 0 && fs.existsSync(aabDir)) {
-          const aabFiles = fs.readdirSync(aabDir).filter(f => f.endsWith('.aab'));
-          if (aabFiles.length > 0) {
-            const sourceAab = path.join(aabDir, aabFiles[0]);
-            const finalAabName = `${cleanAppName}-release.aab`;
-            const finalAabPath = path.join(apksDir, finalAabName);
-            
-            fs.copyFileSync(sourceAab, finalAabPath);
-            results.aab = finalAabName;
-            console.log(`📦 Play Store AAB: ${finalAabName}`);
-          }
-        }
-        
-        // Also generate debug APK for testing
-        console.log('🔧 Building debug APK for testing...');
-        const debugBuild = spawn(gradlewCmd, ['assembleDebug'], {
+        const aabBuild = spawn(gradlewCmd, ['bundleRelease', '--stacktrace'], {
           cwd: androidDir,
           shell: true,
           stdio: 'pipe'
         });
         
-        debugBuild.on('close', (debugCode) => {
-          if (debugCode === 0) {
-            const debugApkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug');
-            if (fs.existsSync(debugApkDir)) {
-              const debugApkFiles = fs.readdirSync(debugApkDir).filter(f => f.endsWith('.apk'));
-              if (debugApkFiles.length > 0) {
-                const sourceDebugApk = path.join(debugApkDir, debugApkFiles[0]);
-                const finalDebugApkName = `${cleanAppName}-debug.apk`;
-                const finalDebugApkPath = path.join(apksDir, finalDebugApkName);
-                
-                fs.copyFileSync(sourceDebugApk, finalDebugApkPath);
-                results.debug = finalDebugApkName;
-                console.log(`🔧 Debug APK: ${finalDebugApkName}`);
-              }
+        let aabOutput = '';
+        aabBuild.stdout.on('data', (data) => {
+          aabOutput += data.toString();
+        });
+        
+        aabBuild.stderr.on('data', (data) => {
+          aabOutput += data.toString();
+        });
+        
+        aabBuild.on('close', (aabCode) => {
+          if (aabCode !== 0) {
+            console.log('⚠️  AAB build failed, but APK succeeded. Continuing...');
+            console.log('🔍 AAB build output:', aabOutput.slice(-1000));
+          } else {
+            console.log('✅ AAB build completed successfully!');
+          }
+          
+          // Find and organize the generated files
+          const apkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release');
+          const aabDir = path.join(androidDir, 'app', 'build', 'outputs', 'bundle', 'release');
+          
+          const cleanAppName = appName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+          const apksDir = path.join(__dirname, 'apks');
+          fs.ensureDirSync(apksDir);
+          
+          const results = {
+            apk: null,
+            aab: null,
+            debug: null
+          };
+          
+          // Copy release APK
+          if (fs.existsSync(apkDir)) {
+            const apkFiles = fs.readdirSync(apkDir).filter(f => f.endsWith('.apk'));
+            if (apkFiles.length > 0) {
+              const sourceApk = path.join(apkDir, apkFiles[0]);
+              const finalApkName = `${cleanAppName}-release.apk`;
+              const finalApkPath = path.join(apksDir, finalApkName);
+              
+              fs.copyFileSync(sourceApk, finalApkPath);
+              results.apk = finalApkName;
+              console.log(`📱 Release APK: ${finalApkName}`);
             }
           }
           
-          console.log('🎉 Build process completed!');
-          console.log('📱 Ready for testing:', results.debug);
-          console.log('🏪 Ready for Play Store:', results.aab || results.apk);
+          // Copy AAB for Play Store if it exists
+          if (aabCode === 0 && fs.existsSync(aabDir)) {
+            const aabFiles = fs.readdirSync(aabDir).filter(f => f.endsWith('.aab'));
+            if (aabFiles.length > 0) {
+              const sourceAab = path.join(aabDir, aabFiles[0]);
+              const finalAabName = `${cleanAppName}-release.aab`;
+              const finalAabPath = path.join(apksDir, finalAabName);
+              
+              fs.copyFileSync(sourceAab, finalAabPath);
+              results.aab = finalAabName;
+              console.log(`📦 Play Store AAB: ${finalAabName}`);
+            }
+          }
           
-          resolve(results);
+          // Also generate debug APK for testing
+          console.log('🔧 Building debug APK for testing...');
+          const debugBuild = spawn(gradlewCmd, ['assembleDebug'], {
+            cwd: androidDir,
+            shell: true,
+            stdio: 'pipe'
+          });
+          
+          debugBuild.on('close', (debugCode) => {
+            if (debugCode === 0) {
+              const debugApkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug');
+              if (fs.existsSync(debugApkDir)) {
+                const debugApkFiles = fs.readdirSync(debugApkDir).filter(f => f.endsWith('.apk'));
+                if (debugApkFiles.length > 0) {
+                  const sourceDebugApk = path.join(debugApkDir, debugApkFiles[0]);
+                  const finalDebugApkName = `${cleanAppName}-debug.apk`;
+                  const finalDebugApkPath = path.join(apksDir, finalDebugApkName);
+                  
+                  fs.copyFileSync(sourceDebugApk, finalDebugApkPath);
+                  results.debug = finalDebugApkName;
+                  console.log(`🔧 Debug APK: ${finalDebugApkName}`);
+                }
+              }
+            }
+            
+            console.log('🎉 Build process completed!');
+            console.log('📱 Ready for testing:', results.debug);
+            console.log('🏪 Ready for Play Store:', results.aab || results.apk);
+            
+            resolve(results);
+          });
         });
       });
     });
@@ -1490,6 +1557,18 @@ async function generatePlayStoreBuilds(appDir, appName, packageName) {
       console.log('💡 You can add Android platform with: npx cap add android');
       return;
     }
+    
+    // Validate build environment before proceeding
+    console.log('🔍 Validating build environment...');
+    const validationResult = await validateBuildEnvironment(appDir);
+    if (!validationResult.valid) {
+      console.log('❌ Build environment validation failed:');
+      validationResult.errors.forEach(error => console.log(`  - ${error}`));
+      console.log('💡 Please fix the above issues before building.');
+      throw new Error('Build environment validation failed');
+    }
+    
+    console.log('✅ Build environment validation passed');
     
     // Step 1: Generate keystore for release signing
     console.log('🔑 Step 1: Generating release keystore...');
@@ -1516,6 +1595,67 @@ async function generatePlayStoreBuilds(appDir, appName, packageName) {
     console.error('❌ Play Store build generation failed:', error.message);
     throw error;
   }
+}
+
+// Validate build environment
+async function validateBuildEnvironment(appDir) {
+  const errors = [];
+  const warnings = [];
+  
+  // Check Android SDK
+  const androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+  if (!androidHome) {
+    errors.push('ANDROID_HOME or ANDROID_SDK_ROOT environment variable not set');
+  } else if (!fs.existsSync(androidHome)) {
+    errors.push(`Android SDK path does not exist: ${androidHome}`);
+  }
+  
+  // Check Java
+  const javaHome = process.env.JAVA_HOME;
+  if (!javaHome) {
+    warnings.push('JAVA_HOME environment variable not set');
+  } else if (!fs.existsSync(javaHome)) {
+    warnings.push(`Java path does not exist: ${javaHome}`);
+  }
+  
+  // Check Android project structure
+  const androidDir = path.join(appDir, 'android');
+  const buildGradlePath = path.join(androidDir, 'app', 'build.gradle');
+  const gradlewPath = path.join(androidDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+  
+  if (!fs.existsSync(buildGradlePath)) {
+    errors.push('Android build.gradle not found');
+  }
+  
+  if (!fs.existsSync(gradlewPath)) {
+    errors.push('Gradle wrapper not found');
+  }
+  
+  // Check for keytool (needed for keystore generation)
+  try {
+    await new Promise((resolve, reject) => {
+      const keytool = spawn('keytool', ['-help'], { stdio: 'pipe' });
+      keytool.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error('keytool not available'));
+      });
+      keytool.on('error', reject);
+    });
+  } catch (error) {
+    errors.push('keytool not available (required for keystore generation)');
+  }
+  
+  // Print warnings
+  if (warnings.length > 0) {
+    console.log('⚠️  Build environment warnings:');
+    warnings.forEach(warning => console.log(`  - ${warning}`));
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings
+  };
 }
 
 // Create a comprehensive Play Store submission guide

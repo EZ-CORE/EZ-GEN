@@ -13,6 +13,8 @@ services:
       - ../generated-apps:/app/generated-apps
       # Persist uploads temporarily
       - ../uploads:/app/uploads
+      # Persist generated APKs
+      - ../apks:/app/apks
     environment:
       - NODE_ENV=development
       - PORT=3000
