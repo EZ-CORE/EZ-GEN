@@ -9,3 +9,4 @@ Firebase/*.json
 *-adminsdk-*.json
 *.env
 .env*
+.DS_Store
